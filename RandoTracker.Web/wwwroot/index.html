@@ -1,0 +1,11 @@
+<ul id="liste"></ul>
+
+<script>
+async function charger() {
+    const reponse = await fetch('/api/sorties');
+    const sorties = await reponse.json();
+
+    document.getElementById('liste').innerHTML = sorties.map(sortie => `<li>${sortie.nom} - ${sortie.dateDebut}</li>`).join('');
+}
+charger();
+</script>

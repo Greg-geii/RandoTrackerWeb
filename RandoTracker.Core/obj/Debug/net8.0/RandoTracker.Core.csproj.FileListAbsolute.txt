@@ -1,0 +1,12 @@
+/home/greg/RandoTrackerSln/RandoTracker.Core/bin/Debug/net8.0/RandoTracker.Core.deps.json
+/home/greg/RandoTrackerSln/RandoTracker.Core/bin/Debug/net8.0/RandoTracker.Core.dll
+/home/greg/RandoTrackerSln/RandoTracker.Core/bin/Debug/net8.0/RandoTracker.Core.pdb
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/RandoTracker.Core.csproj.AssemblyReference.cache
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/RandoTracker.Core.GeneratedMSBuildEditorConfig.editorconfig
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/RandoTracker.Core.AssemblyInfoInputs.cache
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/RandoTracker.Core.AssemblyInfo.cs
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/RandoTracker.Core.csproj.CoreCompileInputs.cache
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/RandoTracker.Core.dll
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/refint/RandoTracker.Core.dll
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/RandoTracker.Core.pdb
+/home/greg/RandoTrackerSln/RandoTracker.Core/obj/Debug/net8.0/ref/RandoTracker.Core.dll
