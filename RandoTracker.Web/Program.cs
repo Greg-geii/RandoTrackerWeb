@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using Microsoft.Data.Sqlite;
 using RandoTracker.Core.Donnees;
 using RandoTracker.Core.Geographie;
@@ -209,7 +210,51 @@ app.MapGet("/api/materiel/alertes", MaterielEndpoint.ObtenirAlertes);
 app.MapPost("/api/materiel/candidats/{candidatId:long}/photos", MaterielPhotosEndpoint.Ajouter).DisableAntiforgery();
 app.MapDelete("/api/materiel/photos/{id:long}", MaterielPhotosEndpoint.Supprimer);
 
+// Sauvegarde complète : base + photos (GPX et matériel) dans un .zip.
+// VACUUM INTO plutôt qu'une copie brute du fichier : une copie de secours
+// garantie cohérente, même avec d'autres connexions actives au même moment.
+app.MapGet("/api/export", () =>
+{
+    string cheminTemp = Path.Combine(Path.GetTempPath(), $"randos-export-{Guid.NewGuid()}.db");
+
+    try
+    {
+        using (var db = new RandoDb("randos.db"))
+        {
+            var cmd = db.Connexion.CreateCommand();
+            cmd.CommandText = $"VACUUM INTO '{cheminTemp.Replace("'", "''")}'";
+            cmd.ExecuteNonQuery();
+        }
+
+        var memoire = new MemoryStream();
+        using (var archive = new ZipArchive(memoire, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            archive.CreateEntryFromFile(cheminTemp, "randos.db");
+            AjouterDossierAuZip(archive, Path.Combine(app.Environment.WebRootPath, "photos"), "photos");
+            AjouterDossierAuZip(archive, Path.Combine(app.Environment.WebRootPath, "materiel-photos"), "materiel-photos");
+        }
+        memoire.Position = 0;
+
+        return Results.File(memoire, "application/zip", $"randotracker-export-{DateTime.Now:yyyy-MM-dd}.zip");
+    }
+    finally
+    {
+        if (File.Exists(cheminTemp)) File.Delete(cheminTemp);
+    }
+});
+
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.Run();
+
+static void AjouterDossierAuZip(ZipArchive archive, string dossier, string prefixe)
+{
+    if (!Directory.Exists(dossier)) return;
+
+    foreach (string fichier in Directory.EnumerateFiles(dossier, "*", SearchOption.AllDirectories))
+    {
+        string nomRelatif = Path.GetRelativePath(dossier, fichier).Replace('\\', '/');
+        archive.CreateEntryFromFile(fichier, $"{prefixe}/{nomRelatif}");
+    }
+}

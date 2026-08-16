@@ -60,7 +60,9 @@ button { font: inherit; cursor: pointer; }
 .marque-losange { width: 7px; height: 7px; border: 1.5px solid currentColor; transform: rotate(45deg); flex-shrink: 0; }
 .nav-item.actif .marque-losange { background: var(--accent); border-color: var(--accent); }
 
-.sidebar-pied { margin-top: auto; padding: 1rem 1.3rem; border-top: 1px solid var(--ligne); font-family: var(--police-donnees); font-size: 0.66rem; color: var(--texte-discret); letter-spacing: 0.03em; }
+.sidebar-pied { margin-top: auto; padding: 1rem 1.3rem; border-top: 1px solid var(--ligne); font-family: var(--police-donnees); font-size: 0.66rem; color: var(--texte-discret); letter-spacing: 0.03em; display: flex; flex-direction: column; gap: 0.5rem; }
+.lien-export { color: var(--texte-discret); text-decoration: none; }
+.lien-export:hover { color: var(--accent); }
 
 /* ── Contenu principal ── */
 
@@ -140,6 +142,38 @@ button { font: inherit; cursor: pointer; }
 @media (max-width: 640px) {
   .sortie-carte { grid-template-columns: 1fr; }
   .sortie-carte-croquis { border-right: none; border-bottom: 1px solid var(--ligne); }
+}
+
+/* ── Bascule Fil / Calendrier ── */
+
+.bascule-vue { display: flex; border: 1px solid var(--ligne); }
+.bascule-vue .bouton-discret { border: none; border-right: 1px solid var(--ligne); }
+.bascule-vue .bouton-discret:last-child { border-right: none; }
+.bascule-vue .bouton-discret.actif { background: var(--ligne-forte); color: #fff; }
+
+/* ── Calendrier des sorties ── */
+
+.calendrier-entete { display: flex; align-items: center; justify-content: center; gap: 0.9rem; padding: 1rem 1.3rem; border-bottom: 1px solid var(--ligne); }
+.calendrier-entete h3 { font-family: var(--police-titre); font-weight: 600; text-transform: uppercase; font-size: 0.9rem; min-width: 180px; text-align: center; }
+
+.calendrier-grille { display: grid; grid-template-columns: repeat(7, 1fr); }
+
+.calendrier-jour-nom { font-family: var(--police-donnees); font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--texte-discret); text-align: center; padding: 0.5rem 0; border-bottom: 1px solid var(--ligne); }
+
+.calendrier-case { min-height: 92px; border-right: 1px solid var(--ligne); border-bottom: 1px solid var(--ligne); padding: 0.35rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.calendrier-case:nth-child(7n) { border-right: none; }
+.calendrier-case.hors-mois { background: var(--fond); }
+.calendrier-case.hors-mois .calendrier-jour-numero { opacity: 0.4; }
+.calendrier-case.aujourdhui { background: rgba(17,158,125,0.06); }
+.calendrier-jour-numero { font-family: var(--police-donnees); font-size: 0.72rem; color: var(--texte-discret); }
+
+.calendrier-sortie-chip { font-family: var(--police-donnees); font-size: 0.64rem; padding: 0.15rem 0.4rem; background: rgba(17,158,125,0.1); border-left: 2px solid var(--accent); color: var(--texte); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.calendrier-sortie-chip:hover { background: rgba(17,158,125,0.2); }
+
+@media (max-width: 640px) {
+  .calendrier-entete h3 { min-width: 0; flex: 1; }
+  .calendrier-case { min-height: 60px; }
+  .calendrier-sortie-chip { font-size: 0; padding: 0; width: 6px; height: 6px; border-radius: 999px; border-left: none; background: var(--accent); }
 }
 
 /* ── Pages, panneaux à tracé fin et repère de coin ── */
@@ -425,7 +459,10 @@ select.champ-texte { width: 100%; font: inherit; font-family: var(--police-texte
         <button class="nav-item" data-page="materiel"><span class="marque-losange"></span> Matériel</button>
         <button class="nav-item" data-page="materiel-inventaire"><span class="marque-losange"></span> Inventaire</button>
     </nav>
-    <div class="sidebar-pied" id="etat-api">connexion…</div>
+    <div class="sidebar-pied">
+        <div id="etat-api">connexion…</div>
+        <a href="/api/export" class="lien-export">⬇ Exporter mes données</a>
+    </div>
 </aside>
 
 <div class="main">
@@ -463,6 +500,10 @@ select.champ-texte { width: 100%; font: inherit; font-family: var(--police-texte
             <div class="panel-tete">
                 <h2>Toutes les sorties</h2>
                 <div class="actions">
+                    <div class="bascule-vue">
+                        <button class="bouton-discret actif" id="bouton-vue-fil" type="button">Fil</button>
+                        <button class="bouton-discret" id="bouton-vue-calendrier" type="button">Calendrier</button>
+                    </div>
                     <select id="tri-sorties" class="filtre">
                         <option value="date-desc">Plus récentes</option>
                         <option value="date-asc">Plus anciennes</option>
@@ -475,6 +516,15 @@ select.champ-texte { width: 100%; font: inherit; font-family: var(--police-texte
             </div>
             <div class="barre-filtres" id="filtres-sorties-tags" hidden></div>
             <div class="fil-sorties" id="fil-sorties"></div>
+            <div class="calendrier-sorties" id="calendrier-sorties" hidden>
+                <div class="calendrier-entete">
+                    <button class="bouton-discret" id="calendrier-mois-precedent" type="button">←</button>
+                    <h3 id="calendrier-titre-mois"></h3>
+                    <button class="bouton-discret" id="calendrier-mois-suivant" type="button">→</button>
+                    <button class="bouton-discret" id="calendrier-aujourdhui" type="button">Aujourd'hui</button>
+                </div>
+                <div class="calendrier-grille" id="calendrier-grille"></div>
+            </div>
         </div>
     </section>
 
@@ -929,17 +979,30 @@ async function chargerListe() {
     document.getElementById('instrument-allure').innerHTML =
         vitesseGlobale ? `${formaterAllure(vitesseGlobale)}<small>/km</small>` : '—';
 
-    creerBarreFiltres(document.getElementById('filtres-sorties-tags'), sorties, filtresSortiesActifs, afficherFilSorties);
-    afficherFilSorties();
+    creerBarreFiltres(document.getElementById('filtres-sorties-tags'), sorties, filtresSortiesActifs, actualiserVueSorties);
+    actualiserVueSorties();
 
     remplirSelectSorties(sorties);
     chargerCarteParcs();
 }
 
-function afficherFilSorties() {
+// Filtre par tag/discipline + recherche texte, commun au fil et au
+// calendrier — seul le tri (propre au fil) ne s'applique pas ici.
+function sortiesFiltrees() {
     const terme = document.getElementById('filtre-sorties').value.trim().toLowerCase();
-    const tri = document.getElementById('tri-sorties').value;
+    return cacheSorties.filter(r => entiteCorrespondAuxFiltres(r.sortie, filtresSortiesActifs)
+        && (terme.length === 0 || r.sortie.nom.toLowerCase().includes(terme)));
+}
 
+// Ne rafraîchit que la vue actuellement visible — inutile de reconstruire
+// le calendrier à chaque frappe si c'est le fil qui est affiché, et inversement.
+function actualiserVueSorties() {
+    if (document.getElementById('calendrier-sorties').hidden) afficherFilSorties();
+    else afficherCalendrier();
+}
+
+function afficherFilSorties() {
+    const tri = document.getElementById('tri-sorties').value;
     const comparateurs = {
         'date-desc': (a, b) => (b.sortie.dateDebut || '').localeCompare(a.sortie.dateDebut || ''),
         'date-asc': (a, b) => (a.sortie.dateDebut || '').localeCompare(b.sortie.dateDebut || ''),
@@ -947,10 +1010,7 @@ function afficherFilSorties() {
         'denivele-desc': (a, b) => b.sortie.denivelePositif - a.sortie.denivelePositif,
     };
 
-    const visibles = cacheSorties
-        .filter(r => entiteCorrespondAuxFiltres(r.sortie, filtresSortiesActifs)
-            && (terme.length === 0 || r.sortie.nom.toLowerCase().includes(terme)))
-        .sort(comparateurs[tri]);
+    const visibles = sortiesFiltrees().sort(comparateurs[tri]);
 
     document.getElementById('fil-sorties').innerHTML = visibles.map(carteSortieHtml).join('');
 
@@ -958,8 +1018,110 @@ function afficherFilSorties() {
         carte.addEventListener('click', () => afficherDetail(carte.dataset.id)));
 }
 
-document.getElementById('filtre-sorties').addEventListener('input', afficherFilSorties);
-document.getElementById('tri-sorties').addEventListener('change', afficherFilSorties);
+document.getElementById('filtre-sorties').addEventListener('input', actualiserVueSorties);
+document.getElementById('tri-sorties').addEventListener('change', actualiserVueSorties);
+
+// ── Bascule Fil / Calendrier ──────────────────────────────────
+
+document.getElementById('bouton-vue-fil').addEventListener('click', () => basculerVueSorties('fil'));
+document.getElementById('bouton-vue-calendrier').addEventListener('click', () => basculerVueSorties('calendrier'));
+
+function basculerVueSorties(vue) {
+    document.getElementById('bouton-vue-fil').classList.toggle('actif', vue === 'fil');
+    document.getElementById('bouton-vue-calendrier').classList.toggle('actif', vue === 'calendrier');
+    document.getElementById('fil-sorties').hidden = vue !== 'fil';
+    document.getElementById('calendrier-sorties').hidden = vue !== 'calendrier';
+    if (vue === 'calendrier') afficherCalendrier();
+}
+
+// ── Calendrier des sorties ────────────────────────────────────
+
+let moisAffiche = new Date();
+moisAffiche.setDate(1); // n'importe quel jour du mois affiché ferait l'affaire, on fixe au 1er
+
+const NOMS_MOIS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+const NOMS_JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+document.getElementById('calendrier-mois-precedent').addEventListener('click', () => {
+    moisAffiche.setMonth(moisAffiche.getMonth() - 1);
+    afficherCalendrier();
+});
+document.getElementById('calendrier-mois-suivant').addEventListener('click', () => {
+    moisAffiche.setMonth(moisAffiche.getMonth() + 1);
+    afficherCalendrier();
+});
+document.getElementById('calendrier-aujourdhui').addEventListener('click', () => {
+    moisAffiche = new Date();
+    moisAffiche.setDate(1);
+    afficherCalendrier();
+});
+
+function formaterDateLocale(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const j = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${j}`;
+}
+
+// Comparaison de chaînes "yyyy-MM-dd", jamais d'objet Date construit à
+// partir d'une chaîne serveur — évite tout souci de fuseau horaire.
+function dateDansPeriode(dateStr, debut, fin) {
+    if (!debut) return false;
+    const d = debut.slice(0, 10);
+    const f = (fin || debut).slice(0, 10);
+    return dateStr >= d && dateStr <= f;
+}
+
+function afficherCalendrier() {
+    document.getElementById('calendrier-titre-mois').textContent =
+        `${NOMS_MOIS[moisAffiche.getMonth()]} ${moisAffiche.getFullYear()}`;
+
+    const annee = moisAffiche.getFullYear();
+    const mois = moisAffiche.getMonth();
+    const premierJour = new Date(annee, mois, 1);
+    const dernierJour = new Date(annee, mois + 1, 0);
+
+    // getDay() renvoie 0 pour dimanche : décalage pour commencer la semaine
+    // au lundi, plus courant dans un calendrier français.
+    const decalageDebut = (premierJour.getDay() + 6) % 7;
+
+    const jours = [];
+    for (let i = decalageDebut; i > 0; i--) jours.push({ date: new Date(annee, mois, 1 - i), horsMois: true });
+    for (let j = 1; j <= dernierJour.getDate(); j++) jours.push({ date: new Date(annee, mois, j), horsMois: false });
+    while (jours.length % 7 !== 0) {
+        const derniere = jours[jours.length - 1].date;
+        // L'année/le mois viennent de `derniere`, pas des variables `annee`/
+        // `mois` du mois affiché : une fois qu'on déborde en juillet, réutiliser
+        // `mois` (toujours juin) ferait revenir la boucle en arrière.
+        jours.push({ date: new Date(derniere.getFullYear(), derniere.getMonth(), derniere.getDate() + 1), horsMois: true });
+    }
+
+    const visibles = sortiesFiltrees();
+    const aujourdhui = new Date();
+    const estAujourdhui = d => d.toDateString() === aujourdhui.toDateString();
+
+    const entetes = NOMS_JOURS.map(n => `<div class="calendrier-jour-nom">${n}</div>`).join('');
+
+    const cases = jours.map(({ date, horsMois }) => {
+        const cle = formaterDateLocale(date);
+        const sortiesDuJour = visibles.filter(r => dateDansPeriode(cle, r.sortie.dateDebut, r.sortie.dateFin));
+
+        const chips = sortiesDuJour.map(r =>
+            `<div class="calendrier-sortie-chip" data-id="${r.sortie.id}" title="${r.sortie.nom}">${r.sortie.nom}</div>`).join('');
+
+        return `
+        <div class="calendrier-case${horsMois ? ' hors-mois' : ''}${estAujourdhui(date) ? ' aujourdhui' : ''}">
+            <span class="calendrier-jour-numero">${date.getDate()}</span>
+            ${chips}
+        </div>`;
+    }).join('');
+
+    document.getElementById('calendrier-grille').innerHTML = entetes + cases;
+
+    document.querySelectorAll('.calendrier-sortie-chip').forEach(chip =>
+        chip.addEventListener('click', () => afficherDetail(chip.dataset.id)));
+}
 
 // Coordonnées de tuile Web Mercator (même projection que les tuiles OSM/
 // Leaflet) — nécessaire pour que le tracé SVG se superpose exactement au
