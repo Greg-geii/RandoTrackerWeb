@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RandoTracker.Core", "RandoT
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RandoTracker.Web", "RandoTracker.Web\RandoTracker.Web.csproj", "{45762303-45B9-4921-8F41-027E326F5DCD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RandoTracker.Cli", "RandoTracker.Cli\RandoTracker.Cli.csproj", "{3DBF0C37-AAD8-4716-8DC0-30086A624353}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -24,5 +26,9 @@ Global
 		{45762303-45B9-4921-8F41-027E326F5DCD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{45762303-45B9-4921-8F41-027E326F5DCD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{45762303-45B9-4921-8F41-027E326F5DCD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3DBF0C37-AAD8-4716-8DC0-30086A624353}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3DBF0C37-AAD8-4716-8DC0-30086A624353}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3DBF0C37-AAD8-4716-8DC0-30086A624353}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3DBF0C37-AAD8-4716-8DC0-30086A624353}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -22,22 +22,14 @@ bibliothèque de randonnées préparées.
 
 ## Règle de travail — la plus importante
 
-**C'est un projet d'apprentissage. J'écris le code, tu m'aides à le comprendre.**
-
-Le C# est mon langage professionnel cible (automatisme, SCADA, outils internes).
-Une partie de mes projets antérieurs a été générée par IA et je ne les comprends
-pas — je ne veux pas reproduire ça ici.
+**C'est un projet d'apprentissage. Commente et explique tout ce que tu fait.**
 
 ### Ce que j'attends de toi
 
 - **Explique l'approche avant de proposer du code.** Décris l'algorithme en
-  français, indique les briques du langage à utiliser, laisse-moi écrire.
-- **Quand je bloque, réponds à la question précise**, ne réécris pas la fonction.
-- **Signale les erreurs et explique pourquoi c'est faux**, plutôt que de corriger
-  silencieusement.
-- **Ne code à ma place que si je le demande explicitement.** Je le fais pour le
-  travail mécanique — nettoyage, refactoring, mise en forme, plomberie répétitive.
-  Dis-le clairement quand tu estimes qu'un morceau vaut le coup que je l'écrive.
+  français, indique les briques du langage à utiliser.
+- **Quand je bloque, réponds à la question précise**.
+- **Signale les erreurs et explique pourquoi c'est faux**.
 
 ### Ce qui me fait perdre mon temps
 
@@ -58,7 +50,7 @@ Text et automatisme industriel, Linux (Fedora KDE), Git, auto-hébergement
 (VPS, Docker, Traefik).
 
 **En cours** : C# et .NET (débuté en août 2026), LINQ, ASP.NET Core, la
-séparation front/back — c'est explicitement ce que je veux comprendre.
+séparation front/back .
 
 **Peu pratiqué** : Python (je sais lire et modifier, pas construire),
 JavaScript et CSS.
@@ -161,7 +153,7 @@ Les fichiers réels sont irréguliers. Le code doit encaisser sans planter :
 
 - Commentaires, noms de variables et messages utilisateur **en français**.
 - PascalCase pour les types et méthodes, camelCase pour les variables locales.
-- Accolades Allman (sur leur propre ligne).
+- Accolades Style K&R .
 - Commentaires XML `///` sur les fonctions publiques.
 - Les commentaires expliquent **pourquoi**, pas quoi. Un commentaire qui
   paraphrase la ligne suivante est du bruit.
@@ -199,4 +191,4 @@ front minimal.
 5. Modèle de vitesse personnel par tranche de pente, puis prédiction de durée
    sur une trace planifiée
 6. Authentification avant exposition sur mon VPS
-7. Inventaire du matériel, bibliothèque de randos préparées
+7. Inventaire du matériel, bibliothèque de randos préparées# RandoTracker

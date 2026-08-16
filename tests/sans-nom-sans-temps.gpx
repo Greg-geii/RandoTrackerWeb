@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <trkseg>
+      <trkpt lat="44.1825" lon="4.4022"><ele>250.0</ele></trkpt>
+      <trkpt lat="44.1830" lon="4.4030"></trkpt>
+      <trkpt lat="44.1840" lon="4.4045"><ele>280.2</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

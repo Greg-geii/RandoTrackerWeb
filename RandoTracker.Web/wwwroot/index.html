@@ -1,11 +1,2762 @@
-<ul id="liste"></ul>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RandoTracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%BE%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@600&family=Anton&family=JetBrains+Mono:wght@400;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2/dist/chartjs-plugin-zoom.min.js"></script>
+<style>
+/* ── Identité « Relevé d'instruments » : schéma d'instrumentation clair,
+   traits fins, un seul accent teal. Tout se règle depuis ces variables. ── */
+:root {
+    --fond: #fbfbf9;
+    --carte: #ffffff;
+    --texte: #1a2421;
+    --texte-discret: #6b7570;
+    --ligne: #c3cbc6;
+    --ligne-forte: #3c4a45;
+    --accent: #119e7d;
+    --positif: #119e7d;
+    --negatif: #b9662a;
+    --sidebar-largeur: 216px;
+    --contenu-largeur: 1040px;
+
+    --police-titre: 'Oswald', system-ui, sans-serif;
+    --police-chiffres: 'Anton', 'Oswald', sans-serif;
+    --police-donnees: 'JetBrains Mono', ui-monospace, monospace;
+    --police-texte: system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body { margin: 0; background: var(--fond); }
+
+.app { font-family: var(--police-texte); color: var(--texte); background: var(--fond); min-height: 100vh; }
+
+h1, h2 { font-family: var(--police-titre); text-transform: uppercase; font-weight: 600; letter-spacing: 0.02em; margin: 0; color: var(--texte); }
+
+button { font: inherit; cursor: pointer; }
+
+/* ── Rail de navigation ── */
+
+.sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: var(--sidebar-largeur); background: var(--carte); border-right: 1px solid var(--ligne); display: flex; flex-direction: column; z-index: 10; }
+
+.sidebar-marque { padding: 1.5rem 1.3rem; border-bottom: 1px solid var(--ligne); }
+.sidebar-marque strong { display: block; font-family: var(--police-titre); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.sidebar-marque small { display: block; font-family: var(--police-donnees); font-size: 0.68rem; color: var(--texte-discret); margin-top: 0.25rem; }
+
+.sidebar nav { padding: 0.8rem 0; display: flex; flex-direction: column; }
+
+.nav-item { display: flex; align-items: center; gap: 0.65rem; background: none; border: none; border-left: 2px solid transparent; color: var(--texte-discret); font-family: var(--police-titre); font-weight: 600; font-size: 0.88rem; text-transform: uppercase; letter-spacing: 0.03em; padding: 0.7rem 1.3rem; text-align: left; }
+.nav-item:hover { color: var(--texte); background: rgba(17,158,125,0.05); }
+.nav-item.actif { color: var(--texte); border-left-color: var(--accent); background: rgba(17,158,125,0.07); }
+
+.marque-losange { width: 7px; height: 7px; border: 1.5px solid currentColor; transform: rotate(45deg); flex-shrink: 0; }
+.nav-item.actif .marque-losange { background: var(--accent); border-color: var(--accent); }
+
+.sidebar-pied { margin-top: auto; padding: 1rem 1.3rem; border-top: 1px solid var(--ligne); font-family: var(--police-donnees); font-size: 0.66rem; color: var(--texte-discret); letter-spacing: 0.03em; }
+
+/* ── Contenu principal ── */
+
+.main { margin-left: var(--sidebar-largeur); }
+
+.topbar { display: flex; align-items: flex-end; justify-content: space-between; padding: 1.8rem 2.2rem 1.2rem; flex-wrap: wrap; gap: 1rem; max-width: var(--contenu-largeur); }
+
+.eyebrow { display: block; font-family: var(--police-donnees); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--texte-discret); margin-bottom: 0.4rem; }
+
+.lien-retour { background: none; border: none; color: var(--texte-discret); font-family: var(--police-titre); font-weight: 600; text-transform: uppercase; font-size: 0.82rem; letter-spacing: 0.03em; padding: 0; margin-bottom: 0.9rem; display: inline-flex; align-items: center; gap: 0.4rem; }
+.lien-retour:hover { color: var(--accent); }
+
+.btn-tech { font-family: var(--police-titre); font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; font-size: 0.85rem; padding: 0.7rem 1.3rem; border: 1.5px solid var(--ligne-forte); background: var(--carte); color: var(--texte); }
+.btn-tech:hover { border-color: var(--accent); color: var(--accent); }
+.btn-tech.plein { background: var(--ligne-forte); color: #fff; border-color: var(--ligne-forte); }
+.btn-tech.plein:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-tech:disabled { opacity: 0.55; cursor: wait; }
+
+.bouton-discret { font-family: var(--police-donnees); font-size: 0.76rem; padding: 0.35rem 0.7rem; border: 1px solid var(--ligne); background: var(--carte); color: var(--texte-discret); }
+.bouton-discret:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Bande de mesures (page Sorties uniquement) ── */
+
+.bande-instruments { padding: 0 0 1.7rem; }
+
+.instruments { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; max-width: var(--contenu-largeur); }
+.instruments.instruments-etendu { grid-template-columns: repeat(5, 1fr); }
+
+.instrument { border: 1px solid var(--ligne); border-top: 3px solid var(--ligne-forte); background: var(--carte); padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.35rem; }
+
+.instrument .tag { font-family: var(--police-donnees); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--texte-discret); }
+.instrument .valeur { font-family: var(--police-chiffres); font-size: 1.7rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.instrument .valeur small { font-size: 0.5em; margin-left: 0.15em; font-weight: 400; font-family: var(--police-texte); }
+
+.instrument.principal { border-top-color: var(--accent); }
+.instrument.principal .valeur { color: var(--accent); }
+
+@media (max-width: 720px) {
+  .instruments, .instruments.instruments-etendu { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Fil des sorties, façon Strava : croquis de tracé, photos, stats clés ── */
+
+.fil-sorties { display: flex; flex-direction: column; gap: 1rem; padding: 1.2rem 1.3rem; }
+
+.sortie-carte { border: 1px solid var(--ligne); background: var(--carte); cursor: pointer; display: grid; grid-template-columns: 180px 1fr; transition: border-color 0.15s ease; }
+.sortie-carte:hover { border-color: var(--accent); }
+
+/* Carré forcé (aspect-ratio) + align-self:start : le croquis ne s'étire pas
+   pour remplir une ligne de grille plus haute que lui (corps avec beaucoup
+   de tags par exemple) — toujours une vignette carrée, comme chez Strava. */
+.sortie-carte-croquis { position: relative; overflow: hidden; background: var(--fond); border-right: 1px solid var(--ligne); aspect-ratio: 1; align-self: start; display: flex; align-items: center; justify-content: center; }
+.sortie-carte-croquis span:not(.croquis-attribution) { font-family: var(--police-donnees); font-size: 0.68rem; color: var(--texte-discret); text-align: center; padding: 0.4rem; }
+
+/* Fond de carte : 2×2 tuiles OSM (les mêmes qu'ailleurs dans l'appli, sans
+   Leaflet — une carte interactive par carte du fil serait bien trop lourde),
+   positionnées en pourcentage pour rester alignées avec le tracé quel que
+   soit le côté réel de la vignette. */
+.croquis-tuiles { position: absolute; inset: 0; }
+.croquis-tuiles img { position: absolute; width: 50%; height: 50%; object-fit: cover; display: block; }
+.croquis-trace { position: absolute; inset: 0; width: 100%; height: 100%; }
+.croquis-attribution { position: absolute; right: 3px; bottom: 2px; font-family: var(--police-donnees); font-size: 0.55rem; color: rgba(255,255,255,0.92); background: rgba(26,36,33,0.5); padding: 0 3px; border-radius: 2px; line-height: 1.4; }
+
+.sortie-carte-corps { padding: 0.9rem 1.1rem; display: flex; flex-direction: column; gap: 0.65rem; min-width: 0; }
+.sortie-carte-titre { font-family: var(--police-titre); font-weight: 600; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.01em; }
+.sortie-carte-periode { font-family: var(--police-donnees); font-size: 0.72rem; color: var(--texte-discret); }
+
+.sortie-carte-photos { display: flex; gap: 0.4rem; }
+.sortie-carte-photos img { width: 52px; height: 52px; object-fit: cover; border: 1px solid var(--ligne); flex-shrink: 0; }
+
+.sortie-carte-stats { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.mini-instrument { display: flex; flex-direction: column; }
+.mini-instrument .valeur { font-family: var(--police-chiffres); font-size: 1.15rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.mini-instrument .valeur small { font-size: 0.55em; margin-left: 0.1em; font-weight: 400; font-family: var(--police-texte); }
+.mini-instrument .tag { font-family: var(--police-donnees); font-size: 0.62rem; color: var(--texte-discret); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0.15rem; }
+
+@media (max-width: 640px) {
+  .sortie-carte { grid-template-columns: 1fr; }
+  .sortie-carte-croquis { border-right: none; border-bottom: 1px solid var(--ligne); }
+}
+
+/* ── Pages, panneaux à tracé fin et repère de coin ── */
+
+.page { padding: 1.8rem 2.2rem 3.5rem; max-width: var(--contenu-largeur); }
+
+.panel { background: var(--carte); border: 1px solid var(--ligne); position: relative; }
+.panel[data-ref]::after { content: attr(data-ref); position: absolute; top: 0.6rem; right: 0.8rem; font-family: var(--police-donnees); font-size: 0.62rem; letter-spacing: 0.05em; color: var(--texte-discret); }
+
+.panel-tete { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.3rem; border-bottom: 1px solid var(--ligne); gap: 0.6rem; flex-wrap: wrap; }
+.panel-tete h2 { font-size: 0.92rem; }
+
+.badge { font-family: var(--police-donnees); font-size: 0.66rem; border: 1px solid var(--ligne); padding: 0.2rem 0.5rem; color: var(--texte-discret); }
+
+.table-donnees { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.table-donnees th, .table-donnees td { text-align: left; padding: 0.8rem 1.3rem; border-bottom: 1px solid var(--ligne); }
+.table-donnees th { color: var(--texte-discret); font-weight: 600; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--police-titre); }
+.table-donnees tbody tr:last-child td { border-bottom: none; }
+
+.ligne-cliquable { cursor: pointer; transition: background 0.15s ease; }
+.ligne-cliquable:hover { background: rgba(17,158,125,0.05); }
+
+.nom-sortie { font-family: var(--police-titre); font-weight: 600; font-size: 0.92rem; text-transform: uppercase; letter-spacing: 0.01em; }
+.nom-sortie span { display: block; font-family: var(--police-donnees); font-weight: 400; font-size: 0.72rem; color: var(--texte-discret); text-transform: none; letter-spacing: 0; margin-top: 0.15rem; }
+
+.num { font-family: var(--police-donnees); font-variant-numeric: tabular-nums; text-align: right; }
+.positif { color: var(--positif); }
+.negatif { color: var(--negatif); }
+
+/* ── Détail : carte pleine largeur, graphiques côte à côte ── */
+
+.grille-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; margin-top: 1.1rem; }
+@media (max-width: 860px) { .grille-detail { grid-template-columns: 1fr; } }
+
+/* Les contrôles internes de Leaflet (zoom, attribution) montent jusqu'à
+   z-index:1000. Sans contexte d'empilement propre, ça passe au-dessus des
+   modales (z-index:100) : on isole donc chaque carte dans le sien. */
+#carte, #carte-parcs, #carte-trace { position: relative; z-index: 0; }
+
+#carte, #carte-trace { height: 420px; }
+
+/* ── Carte des parcs (page Sorties) ── */
+
+#carte-parcs { height: 380px; }
+.carte-parcs-legende { display: flex; align-items: center; gap: 0.6rem; padding: 0.7rem 1.3rem; border-top: 1px solid var(--ligne); font-family: var(--police-donnees); font-size: 0.72rem; color: var(--texte-discret); }
+.degrade-legende { width: 90px; height: 0.8em; background: linear-gradient(to right, rgba(17,158,125,0.06), rgba(17,158,125,0.85)); border: 1px solid var(--ligne); }
+
+.graphique { height: 240px; padding: 1rem 1.3rem 1.3rem; }
+
+.legende { list-style: none; display: flex; flex-wrap: wrap; gap: 1.2rem; margin: 0; padding: 0.8rem 1.3rem; border-bottom: 1px solid var(--ligne); }
+.legende li { display: flex; align-items: center; gap: 0.4rem; font-family: var(--police-donnees); font-size: 0.78rem; color: var(--texte-discret); }
+.puce-legende { width: 0.8em; height: 0.8em; display: inline-block; }
+
+.message { color: var(--texte-discret); font-style: italic; padding: 0 1.3rem 0.8rem; margin: 0; font-size: 0.88rem; }
+
+/* ── Formulaire d'ajout (dans la modale) ── */
+
+.champ { margin-bottom: 0; }
+.champ label { display: block; font-family: var(--police-titre); font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--texte-discret); margin-bottom: 0.4rem; }
+input[type="file"] { font-family: var(--police-donnees); font-size: 0.82rem; width: 100%; color: var(--texte); }
+
+.option-radio { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 0.85rem; border: 1px solid var(--ligne); }
+.option-radio select, .option-radio input[type="text"] { flex: 1; font: inherit; font-family: var(--police-donnees); font-size: 0.85rem; padding: 0.4rem 0.5rem; border: 1px solid var(--ligne); background: var(--fond); color: var(--texte); }
+.option-radio select:disabled, .option-radio input:disabled { opacity: 0.45; }
+
+.reglages { border: 1px solid var(--ligne); padding: 0.65rem 0.85rem; }
+.reglages summary { font-family: var(--police-titre); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--texte-discret); cursor: pointer; }
+.reglages[open] summary { margin-bottom: 0.7rem; }
+.grille-reglages { display: grid; grid-template-columns: 1fr 1fr; gap: 0.7rem; }
+.champ-mini label { display: block; font-family: var(--police-donnees); font-size: 0.7rem; color: var(--texte-discret); margin-bottom: 0.25rem; }
+.champ-mini input { width: 100%; font: inherit; font-family: var(--police-donnees); font-size: 0.85rem; padding: 0.35rem 0.5rem; border: 1px solid var(--ligne); background: var(--fond); color: var(--texte); }
+
+.filtre { font: inherit; font-family: var(--police-donnees); font-size: 0.8rem; padding: 0.3rem 0.6rem; border: 1px solid var(--ligne); background: var(--fond); color: var(--texte); width: 160px; }
+.reglages .message { padding: 0.6rem 0 0; font-size: 0.76rem; }
+
+/* ── Aperçu d'un fichier avant archivage : on voit la trace avant de devoir
+   la classer, utile quand le nom du GPX ne dit rien. ── */
+.apercu { border: 1px solid var(--ligne); }
+#carte-apercu { height: 190px; position: relative; z-index: 0; }
+
+/* ── Résultat de l'ajout ── */
+
+.resultats-upload { list-style: none; padding: 0; margin: 0.6rem 0 0; display: flex; flex-direction: column; gap: 0.4rem; }
+
+.badge-resultat { display: block; padding: 0.45rem 0.65rem; font-size: 0.85rem; font-family: var(--police-donnees); border-left: 3px solid; }
+.badge-succes { background: rgba(17,158,125,0.08); border-color: var(--positif); color: #0b5c47; }
+.badge-attention { background: rgba(185,102,42,0.08); border-color: var(--negatif); color: #7a4419; }
+.badge-erreur { background: rgba(194,59,46,0.08); border-color: #c23b2e; color: #7a251c; }
+
+/* ── Modale « Ajouter une trace » ── */
+
+.voile { position: fixed; inset: 0; background: rgba(26,36,33,0.45); backdrop-filter: blur(3px); display: none; align-items: center; justify-content: center; padding: 1.2rem; z-index: 100; }
+.voile.ouvert { display: flex; }
+
+.modale { background: var(--carte); width: 100%; max-width: 440px; max-height: 90vh; overflow-y: auto; border: 1.5px solid var(--ligne-forte); box-shadow: 0 20px 44px rgba(26,36,33,0.16); animation: apparition 0.15s ease-out; }
+@keyframes apparition { from { transform: translateY(6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .modale { animation: none; } }
+
+.modale-tete { padding: 1.1rem 1.3rem 0.9rem; border-bottom: 1px solid var(--ligne); display: flex; align-items: flex-start; justify-content: space-between; position: sticky; top: 0; background: var(--carte); }
+.modale-tete .eyebrow { margin-bottom: 0.3rem; }
+.modale-titre { font-family: var(--police-titre); font-weight: 600; text-transform: uppercase; font-size: 1rem; letter-spacing: 0.02em; }
+.modale-soulignement { width: 34px; height: 3px; background: var(--accent); margin-top: 0.5rem; }
+.modale-fermer { background: none; border: 1px solid var(--ligne); width: 26px; height: 26px; color: var(--texte-discret); font-size: 0.9rem; line-height: 1; flex-shrink: 0; }
+.modale-fermer:hover { border-color: var(--accent); color: var(--accent); }
+
+.modale-corps { padding: 1.4rem 1.3rem; display: flex; flex-direction: column; gap: 0.9rem; }
+
+.modale-pied { border-top: 1px solid var(--ligne); padding: 0.7rem 1.3rem; font-family: var(--police-donnees); font-size: 0.68rem; color: var(--texte-discret); }
+
+/* ── Fiche de détail d'une trace ── */
+.fiche-trace { display: grid; grid-template-columns: auto 1fr; gap: 0.5rem 1.2rem; margin: 0; font-size: 0.88rem; }
+.fiche-trace dt { color: var(--texte-discret); font-family: var(--police-donnees); font-size: 0.76rem; white-space: nowrap; }
+.fiche-trace dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ── Photos d'une sortie ── */
+
+.grille-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.6rem; padding: 1rem 1.3rem; }
+
+.photo-vignette { aspect-ratio: 1; overflow: hidden; border: 1px solid var(--ligne); cursor: pointer; background: var(--fond); }
+.photo-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photo-vignette:hover { border-color: var(--accent); }
+
+.photo-ajout { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; border: 1.5px dashed var(--ligne); color: var(--texte-discret); font-family: var(--police-donnees); font-size: 0.72rem; text-align: center; cursor: pointer; }
+.photo-ajout:hover { border-color: var(--accent); color: var(--accent); }
+
+.modale-photo img { width: 100%; height: auto; max-height: 70vh; object-fit: contain; display: block; border: 1px solid var(--ligne); background: var(--fond); }
+
+/* ── Matériel : catégories, comparaison de candidats, inventaire ──
+   Registre volontairement plus chaud que le reste de l'appli : ici on
+   compare des objets à acheter, pas des mesures à lire. Coins légèrement
+   arrondis, ombre portée, puces de caractéristiques — les seuls endroits
+   de toute l'appli à s'autoriser ça. ── */
+
+/* ── Tuiles de catégories (page Matériel) ── */
+
+.grille-categories { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; padding: 1.2rem 1.3rem; }
+
+.categorie-tuile { border: 1px solid var(--ligne); border-radius: 8px; background: var(--carte); overflow: hidden; cursor: pointer; display: flex; flex-direction: column; box-shadow: 0 6px 18px rgba(26,36,33,0.06); transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.categorie-tuile:hover { box-shadow: 0 10px 26px rgba(26,36,33,0.1); transform: translateY(-1px); }
+
+.categorie-tuile-photo { height: 120px; background: var(--fond); display: flex; align-items: center; justify-content: center; }
+.categorie-tuile-photo img { width: 100%; height: 100%; object-fit: cover; }
+.categorie-tuile-lettre { font-family: var(--police-chiffres); font-size: 2.6rem; color: var(--ligne); }
+
+.categorie-tuile-corps { padding: 0.8rem 1rem; display: flex; flex-direction: column; gap: 0.45rem; }
+.categorie-titre { font-family: var(--police-titre); font-weight: 600; font-size: 1rem; line-height: 1.25; }
+.categorie-meta { font-family: var(--police-donnees); font-size: 0.72rem; color: var(--texte-discret); }
+
+/* ── Inventaire : une seule grille continue (pas de sous-grille par
+   catégorie — avec un seul article dans la moitié des catégories, ça
+   laissait des rangées à moitié vides). La catégorie s'affiche sur la
+   carte elle-même et se filtre via le sélecteur dédié. Mêmes cartes
+   produit que la comparaison de candidats (.candidat-carte réutilisée). ── */
+
+.grille-inventaire { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; padding: 0.6rem 1.3rem 1.2rem; }
+
+.alerte-ligne.cliquable { cursor: pointer; }
+.alerte-ligne.cliquable:hover { background: rgba(194,59,46,0.05); }
+
+/* ── Barre de filtres par tag / discipline, réutilisée sur les 3 vues ── */
+
+.barre-filtres { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.8rem 1.3rem; border-bottom: 1px solid var(--ligne); }
+.chip-filtre { font: inherit; font-family: var(--police-donnees); font-size: 0.74rem; padding: 0.3rem 0.7rem; border-radius: 999px; border: 1px solid var(--ligne); background: var(--carte); color: var(--texte-discret); cursor: pointer; }
+.chip-filtre-discipline { border-color: #1a7ea8; color: #1a7ea8; }
+.chip-filtre-discipline.actif { background: #1a7ea8; color: #fff; }
+.chip-filtre-tag { border-color: var(--accent); color: var(--accent); }
+.chip-filtre-tag.actif { background: var(--accent); color: #fff; }
+
+/* Puces d'affichage (pas de filtre) sur une carte candidat : mêmes couleurs
+   que les chips de filtre correspondants, pour que la correspondance soit
+   immédiate. */
+.puce-discipline { background: rgba(26,126,168,0.08); border-color: #1a7ea8; color: #1a7ea8; }
+.puce-tag { background: rgba(17,158,125,0.08); border-color: var(--accent); color: var(--accent); }
+
+/* ── Photos sur une carte candidat ── */
+
+.candidat-photos { display: flex; gap: 0.4rem; overflow-x: auto; }
+.candidat-photo-vignette, .candidat-photo-ajout { flex: 0 0 56px; height: 56px; border-radius: 6px; }
+.candidat-photo-vignette { overflow: hidden; cursor: pointer; border: 1px solid var(--ligne); }
+.candidat-photo-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.candidat-photo-ajout { display: flex; align-items: center; justify-content: center; border: 1.5px dashed var(--ligne); color: var(--texte-discret); font-size: 1.1rem; cursor: pointer; }
+.candidat-photo-ajout:hover { border-color: var(--accent); color: var(--accent); }
+
+.badge-statut { display: inline-block; font-family: var(--police-donnees); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.25rem 0.6rem; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.badge-statut-rien, .badge-statut-a_etudier { color: var(--texte-discret); border-color: var(--ligne); }
+.badge-statut-en_cours { color: #7a5a1c; border-color: #c99a3a; background: rgba(201,154,58,0.1); }
+.badge-statut-tranche, .badge-statut-retenu { color: var(--accent); border-color: var(--accent); background: rgba(17,158,125,0.1); }
+.badge-statut-achete { color: #0b5c47; border-color: var(--positif); background: rgba(17,158,125,0.18); }
+.badge-statut-ecarte { color: #9a3f30; border-color: #d99183; background: rgba(194,59,46,0.06); }
+
+.grille-candidats { display: flex; gap: 1.1rem; padding: 1.2rem 1.3rem; overflow-x: auto; align-items: flex-start; }
+
+.candidat-carte { flex: 0 0 290px; border: 1px solid var(--ligne); border-radius: 8px; background: var(--carte); padding: 1.1rem 1.2rem; display: flex; flex-direction: column; gap: 0.7rem; box-shadow: 0 6px 18px rgba(26,36,33,0.06); transition: box-shadow 0.15s ease, transform 0.15s ease; }
+.candidat-carte:hover { box-shadow: 0 10px 26px rgba(26,36,33,0.1); transform: translateY(-1px); }
+.candidat-carte[data-statut="ecarte"] { opacity: 0.7; }
+
+.candidat-entete { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem 0.8rem; }
+.candidat-identite { display: flex; flex-direction: column; gap: 0.2rem; }
+.candidat-marque { font-family: var(--police-donnees); font-size: 0.72rem; color: var(--texte-discret); text-transform: uppercase; letter-spacing: 0.04em; }
+.candidat-titre { font-family: var(--police-titre); font-weight: 600; font-size: 1.12rem; line-height: 1.2; }
+
+.candidat-prix { font-family: var(--police-chiffres); font-size: 1.5rem; color: var(--accent); line-height: 1; white-space: nowrap; }
+
+.candidat-verdict { font-size: 0.9rem; line-height: 1.45; margin: 0; padding: 0.65rem 0.8rem; border-radius: 6px; background: rgba(60,74,69,0.05); }
+.candidat-carte[data-statut="retenu"] .candidat-verdict, .candidat-carte[data-statut="achete"] .candidat-verdict { background: rgba(17,158,125,0.08); }
+.candidat-carte[data-statut="ecarte"] .candidat-verdict { background: rgba(194,59,46,0.06); }
+
+.specs-puces { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.puce-spec { display: inline-flex; align-items: baseline; gap: 0.3rem; font-size: 0.78rem; padding: 0.3rem 0.65rem; border-radius: 999px; background: var(--fond); border: 1px solid var(--ligne); }
+.puce-spec strong { font-family: var(--police-donnees); font-weight: 700; font-size: 0.68rem; color: var(--texte-discret); text-transform: uppercase; }
+
+.candidat-carte .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; padding-top: 0.3rem; }
+
+.candidat-carte-ajout { flex: 0 0 160px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 1.5px dashed var(--ligne); color: var(--texte-discret); font-family: var(--police-titre); font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; font-size: 0.85rem; text-align: center; cursor: pointer; min-height: 120px; }
+.candidat-carte-ajout:hover { border-color: var(--accent); color: var(--accent); background: rgba(17,158,125,0.04); }
+
+/* ── Édition intégrée aux cartes : plus de fenêtre modale ── */
+
+.candidat-carte-edition { gap: 0.55rem; }
+.candidat-carte-edition .champ-texte { font-size: 0.85rem; padding: 0.45rem 0.55rem; }
+.candidat-carte-edition textarea.champ-texte { min-height: 3.4em; }
+
+.ligne-spec { display: flex; gap: 0.4rem; align-items: center; }
+.ligne-spec input { flex: 1; font: inherit; font-family: var(--police-donnees); font-size: 0.8rem; padding: 0.35rem 0.5rem; border: 1px solid var(--ligne); border-radius: 4px; background: var(--fond); color: var(--texte); min-width: 0; }
+.ligne-spec button { flex: 0 0 auto; background: none; border: 1px solid var(--ligne); border-radius: 4px; width: 26px; height: 26px; color: var(--texte-discret); }
+.ligne-spec button:hover { border-color: var(--negatif); color: var(--negatif); }
+
+.achat-inline { display: flex; flex-direction: column; gap: 0.55rem; padding-top: 0.6rem; margin-top: 0.2rem; border-top: 1px dashed var(--ligne); }
+
+textarea.champ-texte { width: 100%; font: inherit; font-family: var(--police-texte); font-size: 0.88rem; padding: 0.5rem 0.6rem; border: 1px solid var(--ligne); border-radius: 6px; background: var(--fond); color: var(--texte); resize: vertical; }
+input.champ-texte { width: 100%; font: inherit; font-family: var(--police-texte); font-size: 0.88rem; padding: 0.5rem 0.6rem; border: 1px solid var(--ligne); border-radius: 6px; background: var(--fond); color: var(--texte); }
+select.champ-texte { width: 100%; font: inherit; font-family: var(--police-texte); font-size: 0.88rem; padding: 0.5rem 0.6rem; border: 1px solid var(--ligne); border-radius: 6px; background: var(--fond); color: var(--texte); }
+
+.ligne-checkbox { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+
+/* ── Formulaire de nouvelle catégorie, intégré à la page (pas de modale) ── */
+
+.formulaire-inline { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; padding: 1rem 1.3rem; border-bottom: 1px solid var(--ligne); background: rgba(17,158,125,0.03); }
+.formulaire-inline .champ-texte { flex: 1 1 160px; }
+.formulaire-inline input[type="number"] { flex: 0 1 110px; }
+
+.panel-alertes { border-top: 3px solid var(--negatif); }
+.alerte-ligne { display: flex; justify-content: space-between; align-items: baseline; padding: 0.7rem 1.3rem; border-bottom: 1px solid var(--ligne); font-size: 0.88rem; }
+.alerte-ligne:last-child { border-bottom: none; }
+.alerte-echeance { font-family: var(--police-donnees); font-size: 0.78rem; color: var(--negatif); }
+
+@media (max-width: 780px) {
+  .candidat-carte, .candidat-carte-ajout { flex-basis: 82vw; }
+}
+
+/* ── Modale « graphique agrandi » : même habillage, en grand format ── */
+
+.modale-grande { max-width: min(1100px, 94vw); }
+.graphique-grand-conteneur { height: 65vh; min-height: 320px; padding: 1.2rem; }
+
+.panel-tete .actions { display: flex; gap: 0.5rem; }
+
+/* ── Mobile ── */
+
+@media (max-width: 780px) {
+  .sidebar { position: static; width: 100%; height: auto; flex-direction: row; align-items: center; }
+  .sidebar-pied { display: none; }
+  .sidebar nav { flex-direction: row; padding: 0; }
+  .nav-item { border-left: none; border-bottom: 2px solid transparent; }
+  .nav-item.actif { border-left: none; border-bottom-color: var(--accent); }
+  .main { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+
+<aside class="sidebar">
+    <div class="sidebar-marque">
+        <strong>RandoTracker</strong>
+        <small>ANALYSE GPX</small>
+    </div>
+    <nav>
+        <button class="nav-item actif" data-page="sorties"><span class="marque-losange"></span> Sorties</button>
+        <button class="nav-item" data-page="historique"><span class="marque-losange"></span> Historique</button>
+        <button class="nav-item" data-page="prediction"><span class="marque-losange"></span> Prédiction</button>
+        <button class="nav-item" data-page="materiel"><span class="marque-losange"></span> Matériel</button>
+        <button class="nav-item" data-page="materiel-inventaire"><span class="marque-losange"></span> Inventaire</button>
+    </nav>
+    <div class="sidebar-pied" id="etat-api">connexion…</div>
+</aside>
+
+<div class="main">
+
+    <header class="topbar">
+        <div>
+            <span class="eyebrow" id="fil-ariane">Tableau de bord</span>
+            <h1 id="titre-page">Sorties</h1>
+        </div>
+        <button class="btn-tech plein" id="ouvrir-modale" type="button">+ Ajouter une trace</button>
+    </header>
+
+    <!-- ── Page : Sorties ── -->
+    <section class="page" data-page="sorties">
+        <div class="bande-instruments">
+            <div class="instruments instruments-etendu">
+                <div class="instrument"><span class="tag">Sorties</span><span class="valeur" id="instrument-sorties">—</span></div>
+                <div class="instrument"><span class="tag">Distance totale</span><span class="valeur" id="instrument-distance">—</span></div>
+                <div class="instrument principal"><span class="tag">D+ cumulé</span><span class="valeur" id="instrument-dplus">—</span></div>
+                <div class="instrument"><span class="tag">D− cumulé</span><span class="valeur" id="instrument-dmoins">—</span></div>
+                <div class="instrument"><span class="tag">Allure moy.</span><span class="valeur" id="instrument-allure">—</span></div>
+            </div>
+        </div>
+
+        <div class="panel" data-ref="PARCS" style="margin-bottom: 1.1rem;">
+            <div class="panel-tete"><h2>Parcs fréquentés</h2></div>
+            <div id="carte-parcs"></div>
+            <div class="carte-parcs-legende">
+                <span class="degrade-legende"></span>
+                <span>peu → souvent parcouru — classement par centroïde de trace, distance cumulée. Contours : IGN/MNHN.</span>
+            </div>
+        </div>
+
+        <div class="panel" data-ref="SORTIES">
+            <div class="panel-tete">
+                <h2>Toutes les sorties</h2>
+                <div class="actions">
+                    <select id="tri-sorties" class="filtre">
+                        <option value="date-desc">Plus récentes</option>
+                        <option value="date-asc">Plus anciennes</option>
+                        <option value="distance-desc">Distance ↓</option>
+                        <option value="denivele-desc">Dénivelé ↓</option>
+                    </select>
+                    <input type="search" id="filtre-sorties" class="filtre" placeholder="Filtrer…">
+                    <span class="badge" id="badge-sorties"></span>
+                </div>
+            </div>
+            <div class="barre-filtres" id="filtres-sorties-tags" hidden></div>
+            <div class="fil-sorties" id="fil-sorties"></div>
+        </div>
+    </section>
+
+    <!-- ── Page : Détail d'une sortie ── -->
+    <section class="page" data-page="detail" hidden>
+        <button class="lien-retour" data-cible="sorties" type="button">&larr; Sorties</button>
+
+        <div class="instruments instruments-etendu" style="margin-bottom: 1.1rem;">
+            <div class="instrument"><span class="tag">Distance</span><span class="valeur" id="instrument-sortie-distance">—</span></div>
+            <div class="instrument principal"><span class="tag">D+</span><span class="valeur" id="instrument-sortie-dplus">—</span></div>
+            <div class="instrument"><span class="tag">D−</span><span class="valeur" id="instrument-sortie-dmoins">—</span></div>
+            <div class="instrument"><span class="tag">Vitesse ascension.</span><span class="valeur" id="instrument-sortie-vitesse">—</span></div>
+            <div class="instrument"><span class="tag">Allure moy.</span><span class="valeur" id="instrument-sortie-allure">—</span></div>
+        </div>
+
+        <div class="panel" data-ref="TRACES">
+            <div class="panel-tete">
+                <h2 id="titre-detail"></h2>
+                <div class="actions">
+                    <span class="badge" id="badge-detail"></span>
+                    <button id="bouton-renommer-sortie" class="bouton-discret" type="button">✎ Renommer</button>
+                    <button id="bouton-supprimer-sortie" class="bouton-discret" type="button">🗑 Supprimer</button>
+                </div>
+            </div>
+            <div class="formulaire-inline">
+                <input type="text" id="champ-tags-sortie" class="champ-texte" placeholder="Tags (séparés par des virgules)" style="flex: 1 1 220px;">
+                <button id="bouton-enregistrer-tags-sortie" class="bouton-discret" type="button">Enregistrer les tags</button>
+            </div>
+            <table class="table-donnees">
+                <thead><tr><th>Trace</th><th>Date</th><th class="num">Distance</th><th class="num">D+</th><th class="num">D−</th><th></th></tr></thead>
+                <tbody id="corps-traces-detail"></tbody>
+            </table>
+        </div>
+
+        <div class="panel" data-ref="PHOTOS" style="margin-top: 1.1rem;">
+            <div class="panel-tete">
+                <h2>Photos</h2>
+                <span class="badge" id="badge-photos"></span>
+            </div>
+            <div class="grille-photos" id="grille-photos"></div>
+        </div>
+
+        <div class="panel" data-ref="TRACÉ" style="margin-top: 1.1rem;">
+            <div class="panel-tete"><h2>Tracé</h2></div>
+            <ul id="legende-visualisation" class="legende"></ul>
+            <p id="message-visualisation" class="message"></p>
+            <div id="carte"></div>
+        </div>
+
+        <div class="grille-detail">
+            <div class="panel" data-ref="ALTITUDE">
+                <div class="panel-tete">
+                    <h2>Profil altimétrique</h2>
+                    <div class="actions">
+                        <button id="bouton-agrandir-altitude" class="bouton-discret" type="button">⤢ Agrandir</button>
+                        <button id="bouton-reset-altitude" class="bouton-discret" type="button">Réinitialiser le zoom</button>
+                    </div>
+                </div>
+                <div class="graphique"><canvas id="graphique-altitude"></canvas></div>
+            </div>
+            <div class="panel" data-ref="PENTE">
+                <div class="panel-tete">
+                    <h2>Profil de pente</h2>
+                    <div class="actions">
+                        <button id="bouton-agrandir-pente" class="bouton-discret" type="button">⤢ Agrandir</button>
+                        <button id="bouton-reset-pente" class="bouton-discret" type="button">Réinitialiser le zoom</button>
+                    </div>
+                </div>
+                <div class="graphique"><canvas id="graphique-pente"></canvas></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Page : Historique ── -->
+    <section class="page" data-page="historique" hidden>
+        <div class="panel" data-ref="HISTORIQUE">
+            <div class="panel-tete">
+                <h2>Historique des traces</h2>
+                <div class="actions">
+                    <input type="search" id="filtre-historique" class="filtre" placeholder="Filtrer…">
+                    <span class="badge" id="badge-historique"></span>
+                </div>
+            </div>
+            <table class="table-donnees">
+                <thead><tr><th>Trace</th><th>Sortie</th><th class="num">Distance</th><th class="num">D+</th><th class="num">D−</th><th></th></tr></thead>
+                <tbody id="corps-historique"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ── Page : Prédiction ── -->
+    <section class="page" data-page="prediction" hidden>
+        <div class="panel" data-ref="PLANIFIER">
+            <div class="panel-tete"><h2>Planifier une sortie</h2></div>
+            <div style="padding: 1rem 1.3rem;">
+                <div class="champ">
+                    <label for="champ-fichier-prediction">Trace GPX pas encore parcourue</label>
+                    <input type="file" id="champ-fichier-prediction" accept=".gpx">
+                </div>
+                <div id="resultat-prediction"></div>
+            </div>
+        </div>
+
+        <div class="panel" data-ref="MODELE" style="margin-top: 1.1rem;">
+            <div class="panel-tete"><h2>Mon modèle de vitesse</h2><span class="badge" id="badge-modele"></span></div>
+            <p class="message" style="padding: 0.8rem 1.3rem 0;">Vitesse moyenne réelle par tranche de pente, calculée sur toutes les traces archivées avec horodatage. Une tranche sans échantillon retombe sur la vitesse globale lors d'une prédiction.</p>
+            <table class="table-donnees">
+                <thead><tr><th>Pente</th><th class="num">Vitesse</th><th class="num">Échantillons</th></tr></thead>
+                <tbody id="corps-modele"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ── Page : Détail d'une trace ── -->
+    <section class="page" data-page="trace" hidden>
+        <button class="lien-retour" id="bouton-retour-trace" type="button">&larr; Retour</button>
+
+        <div class="panel" data-ref="FICHE">
+            <div class="panel-tete">
+                <h2>Fiche technique</h2>
+                <div class="actions">
+                    <button id="bouton-voir-sortie" class="bouton-discret" type="button">Sortie : <span id="lien-sortie-nom"></span> →</button>
+                    <button id="bouton-deplacer-trace" class="bouton-discret" type="button">↔ Déplacer</button>
+                </div>
+            </div>
+            <dl class="fiche-trace" id="fiche-detail-trace" style="padding: 1rem 1.3rem; margin: 0;"></dl>
+        </div>
+
+        <div class="panel" data-ref="TRACÉ" style="margin-top: 1.1rem;">
+            <div class="panel-tete"><h2>Tracé</h2></div>
+            <p id="message-visualisation-trace" class="message"></p>
+            <div id="carte-trace"></div>
+        </div>
+
+        <div class="grille-detail">
+            <div class="panel" data-ref="ALTITUDE">
+                <div class="panel-tete">
+                    <h2>Profil altimétrique</h2>
+                    <div class="actions">
+                        <button id="bouton-agrandir-altitude-trace" class="bouton-discret" type="button">⤢ Agrandir</button>
+                    </div>
+                </div>
+                <div class="graphique"><canvas id="graphique-altitude-trace"></canvas></div>
+            </div>
+            <div class="panel" data-ref="PENTE">
+                <div class="panel-tete">
+                    <h2>Profil de pente</h2>
+                    <div class="actions">
+                        <button id="bouton-agrandir-pente-trace" class="bouton-discret" type="button">⤢ Agrandir</button>
+                    </div>
+                </div>
+                <div class="graphique"><canvas id="graphique-pente-trace"></canvas></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Page : Détail d'un parc ── -->
+    <section class="page" data-page="parc" hidden>
+        <button class="lien-retour" data-cible="sorties" type="button">&larr; Sorties</button>
+
+        <div class="instruments" style="margin-bottom: 1.1rem;">
+            <div class="instrument"><span class="tag">Traces</span><span class="valeur" id="instrument-parc-traces">—</span></div>
+            <div class="instrument principal"><span class="tag">Distance totale</span><span class="valeur" id="instrument-parc-distance">—</span></div>
+            <div class="instrument"><span class="tag">D+ cumulé</span><span class="valeur" id="instrument-parc-dplus">—</span></div>
+            <div class="instrument"><span class="tag">D− cumulé</span><span class="valeur" id="instrument-parc-dmoins">—</span></div>
+        </div>
+
+        <div class="panel" data-ref="PARC">
+            <div class="panel-tete"><h2>Sorties dans ce parc</h2></div>
+            <table class="table-donnees">
+                <thead><tr><th>Sortie</th><th>Traces</th><th class="num">Distance</th><th class="num">D+</th><th class="num">D−</th></tr></thead>
+                <tbody id="corps-parc"></tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- ── Page : Matériel — liste des catégories ── -->
+    <section class="page" data-page="materiel" hidden>
+        <div class="panel" data-ref="CATEGORIES">
+            <div class="panel-tete">
+                <h2>Catégories de matériel</h2>
+                <div class="actions">
+                    <span class="badge" id="badge-materiel-categories"></span>
+                    <button id="bouton-nouvelle-categorie" class="bouton-discret" type="button">+ Catégorie</button>
+                </div>
+            </div>
+            <div class="formulaire-inline" id="formulaire-nouvelle-categorie" hidden>
+                <input type="text" id="champ-nom-categorie" class="champ-texte" placeholder="Nom de la catégorie">
+                <input type="number" id="champ-priorite-categorie" class="champ-texte" placeholder="Priorité" step="1" min="1">
+                <input type="text" id="champ-notes-categorie" class="champ-texte" placeholder="Notes (optionnel)">
+                <button id="bouton-creer-categorie" class="btn-tech plein" type="button">Créer</button>
+                <button id="bouton-annuler-categorie" class="bouton-discret" type="button">Annuler</button>
+            </div>
+            <p id="message-nouvelle-categorie" class="message"></p>
+            <div class="barre-filtres" id="filtres-categories" hidden></div>
+            <div class="grille-categories" id="grille-categories"></div>
+        </div>
+    </section>
+
+    <!-- ── Page : Matériel — détail d'une catégorie, comparaison ── -->
+    <section class="page" data-page="materiel-categorie" hidden>
+        <button class="lien-retour" data-cible="materiel" type="button">&larr; Matériel</button>
+
+        <div class="panel" data-ref="COMPARAISON">
+            <div class="panel-tete">
+                <h2 id="titre-categorie-materiel"></h2>
+                <span class="badge" id="badge-categorie-materiel"></span>
+            </div>
+            <p class="message" id="notes-categorie-materiel"></p>
+            <div class="barre-filtres" id="filtres-candidats" hidden></div>
+            <div class="grille-candidats" id="grille-candidats"></div>
+        </div>
+    </section>
+
+    <!-- ── Page : Matériel — inventaire et alertes ── -->
+    <section class="page" data-page="materiel-inventaire" hidden>
+        <div class="panel panel-alertes" data-ref="ALERTES" id="panel-alertes" hidden>
+            <div class="panel-tete"><h2>⚠ Fin de vie proche ou dépassée</h2></div>
+            <div id="corps-alertes"></div>
+        </div>
+
+        <div class="panel" data-ref="INVENTAIRE" style="margin-top: 1.1rem;">
+            <div class="panel-tete">
+                <h2>Inventaire</h2>
+                <div class="actions">
+                    <select id="filtre-categorie-inventaire" class="filtre">
+                        <option value="">Toutes catégories</option>
+                    </select>
+                    <span class="badge" id="badge-inventaire"></span>
+                </div>
+            </div>
+            <div class="barre-filtres" id="filtres-inventaire" hidden></div>
+            <div class="grille-inventaire" id="grille-inventaire"></div>
+        </div>
+    </section>
+
+</div>
+</div>
+
+<!-- ── Modale : Ajouter une trace ── -->
+<div class="voile" id="voile-modale">
+    <div class="modale">
+        <div class="modale-tete">
+            <div>
+                <span class="eyebrow">Nouvelle mesure</span>
+                <div class="modale-titre">Ajouter une trace</div>
+                <div class="modale-soulignement"></div>
+            </div>
+            <button class="modale-fermer" id="fermer-modale" type="button">✕</button>
+        </div>
+        <form id="form-ajout">
+            <div class="modale-corps">
+                <div class="champ">
+                    <label for="champ-fichiers">Fichier(s) GPX</label>
+                    <input type="file" id="champ-fichiers" accept=".gpx" multiple required>
+                </div>
+
+                <div id="apercu-traces" class="apercu" hidden>
+                    <div id="carte-apercu"></div>
+                    <ul id="liste-apercu" class="resultats-upload"></ul>
+                </div>
+
+                <label class="option-radio">
+                    <input type="radio" name="cible" value="existante" checked>
+                    <span>Sortie existante</span>
+                    <select id="select-sortie"></select>
+                </label>
+                <label class="option-radio">
+                    <input type="radio" name="cible" value="nouvelle">
+                    <span>Nouvelle sortie</span>
+                    <input type="text" id="champ-nouvelle-sortie" placeholder="Nom de la sortie" disabled>
+                </label>
+
+                <details class="reglages">
+                    <summary>Réglages d'analyse</summary>
+                    <div class="grille-reglages">
+                        <div class="champ-mini">
+                            <label for="reglage-seuil-denivele">Seuil dénivelé (m)</label>
+                            <input type="number" id="reglage-seuil-denivele" class="reglage" step="0.1" min="0" value="0.6">
+                        </div>
+                        <div class="champ-mini">
+                            <label for="reglage-seuil-vitesse">Seuil vitesse (m/s)</label>
+                            <input type="number" id="reglage-seuil-vitesse" class="reglage" step="0.01" min="0" value="0.1">
+                        </div>
+                        <div class="champ-mini">
+                            <label for="reglage-fenetre-pente">Fenêtre de pente (m)</label>
+                            <input type="number" id="reglage-fenetre-pente" class="reglage" step="1" min="0" value="50">
+                        </div>
+                        <div class="champ-mini">
+                            <label for="reglage-pas-profil">Pas du profil (m)</label>
+                            <input type="number" id="reglage-pas-profil" class="reglage" step="1" min="0" value="25">
+                        </div>
+                    </div>
+                    <p class="message">0,5-1 m pour une trace baromètre, 3-5 m pour du GPS seul, rien à filtrer pour une trace redessinée sur carte.</p>
+                </details>
+
+                <button type="submit" id="bouton-envoyer" class="btn-tech plein" style="justify-content: center;">Analyser et archiver</button>
+                <div id="resultat-ajout"></div>
+            </div>
+        </form>
+        <div class="modale-pied">L'analyse est vérifiée avant tout archivage — rien n'est perdu en cas d'erreur.</div>
+    </div>
+</div>
+
+<!-- ── Modale : graphique agrandi ── -->
+<div class="voile" id="voile-graphique">
+    <div class="modale modale-grande">
+        <div class="modale-tete">
+            <div>
+                <span class="eyebrow">Vue agrandie</span>
+                <div class="modale-titre" id="titre-modale-graphique"></div>
+                <div class="modale-soulignement"></div>
+            </div>
+            <button class="modale-fermer" id="fermer-graphique" type="button">✕</button>
+        </div>
+        <div class="graphique-grand-conteneur"><canvas id="graphique-grand"></canvas></div>
+    </div>
+</div>
+
+<!-- ── Modale : photo en grand ── -->
+<div class="voile" id="voile-photo">
+    <div class="modale modale-grande modale-photo" style="max-width: min(760px, 94vw);">
+        <div class="modale-tete">
+            <div>
+                <span class="eyebrow">Photo</span>
+                <div class="modale-titre" id="titre-modale-photo"></div>
+                <div class="modale-soulignement"></div>
+            </div>
+            <button class="modale-fermer" id="fermer-photo" type="button">✕</button>
+        </div>
+        <div style="padding: 1.2rem 1.3rem;"><img id="image-modale-photo" alt=""></div>
+        <div class="modale-pied" style="display: flex; justify-content: flex-end;">
+            <button id="bouton-supprimer-photo" class="bouton-discret" type="button">🗑 Supprimer cette photo</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Modale : déplacer une trace vers une autre sortie ── -->
+<div class="voile" id="voile-deplacer-trace">
+    <div class="modale">
+        <div class="modale-tete">
+            <div>
+                <span class="eyebrow">Réaffectation</span>
+                <div class="modale-titre">Déplacer la trace</div>
+                <div class="modale-soulignement"></div>
+            </div>
+            <button class="modale-fermer" id="fermer-deplacer-trace" type="button">✕</button>
+        </div>
+        <div class="modale-corps">
+            <div class="champ">
+                <label for="select-nouvelle-sortie-trace">Nouvelle sortie</label>
+                <select id="select-nouvelle-sortie-trace"></select>
+            </div>
+            <button id="bouton-confirmer-deplacement" class="btn-tech plein" type="button" style="justify-content: center;">Déplacer</button>
+            <p id="message-deplacement" class="message"></p>
+        </div>
+    </div>
+</div>
 
 <script>
-async function charger() {
+Chart.defaults.font.family = "'JetBrains Mono', ui-monospace, monospace";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = '#6b7570';
+Chart.defaults.borderColor = '#c3cbc6';
+
+// Une couleur par trace, partagée entre la carte, les graphiques et la légende.
+const PALETTE = ['#119e7d', '#b9662a', '#3c4a45', '#8a4fc9', '#c23b2e', '#1a7ea8'];
+
+function formaterPeriode(debut, fin) {
+    if (!debut) return 'date inconnue';
+    const d = debut.slice(0, 10);
+    const f = fin ? fin.slice(0, 10) : null;
+    return f && f !== d ? `${d} → ${f}` : d;
+}
+
+// ── Navigation entre pages ──────────────────────────────────────
+
+const TITRES = {
+    sorties: 'Sorties', historique: 'Historique des traces', prediction: 'Prédiction',
+    materiel: 'Matériel', 'materiel-inventaire': 'Inventaire',
+};
+const FIL_ARIANE = {
+    sorties: 'Tableau de bord', historique: 'Tableau de bord', prediction: 'Planifier une sortie',
+    detail: 'Sorties / Détail', trace: 'Détail de la trace', parc: 'Sorties / Parc',
+    materiel: 'Matériel', 'materiel-categorie': 'Matériel / Catégorie', 'materiel-inventaire': 'Matériel / Inventaire',
+};
+
+// Pages qui restent sous "Sorties" ou "Matériel" dans le rail de navigation,
+// même si elles ne sont pas directement accessibles depuis la barre latérale.
+const PAGES_SOUS_SORTIES = new Set(['detail', 'trace', 'parc']);
+const PAGES_SOUS_MATERIEL = new Set(['materiel-categorie']);
+
+function ouvrirPage(nom, titre) {
+    document.querySelectorAll('.page').forEach(p => p.hidden = p.dataset.page !== nom);
+    document.querySelectorAll('.nav-item').forEach(b =>
+        b.classList.toggle('actif', b.dataset.page === nom
+            || (PAGES_SOUS_SORTIES.has(nom) && b.dataset.page === 'sorties')
+            || (PAGES_SOUS_MATERIEL.has(nom) && b.dataset.page === 'materiel')));
+    document.getElementById('titre-page').textContent = titre ?? TITRES[nom];
+    document.getElementById('fil-ariane').textContent = FIL_ARIANE[nom];
+
+    // La carte des parcs vit sur la page Sorties : si son conteneur était
+    // masqué, Leaflet a calculé sa taille sur du vide (grille de tuiles grises).
+    if (nom === 'sorties') carteParcs?.invalidateSize();
+}
+
+document.querySelectorAll('.nav-item').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.page === 'historique') chargerHistorique();
+    if (b.dataset.page === 'prediction') chargerModeleVitesse();
+    if (b.dataset.page === 'materiel') chargerCategoriesMateriel();
+    if (b.dataset.page === 'materiel-inventaire') chargerInventaire();
+    ouvrirPage(b.dataset.page);
+}));
+document.querySelectorAll('[data-cible]').forEach(el => el.addEventListener('click', () => ouvrirPage(el.dataset.cible)));
+
+// ── Liste des sorties, en fil façon Strava ──────────────────────
+//
+// Un croquis SVG du tracé (pas une carte Leaflet — beaucoup trop lourd à
+// instancier une fois par sortie dans un fil qui peut en compter des
+// dizaines), un aperçu photo, les stats clés. Filtrable par tag (mêmes
+// puces que le module Matériel, la logique est générique) et triable.
+
+let cacheSorties = [];
+let filtresSortiesActifs = new Set();
+
+async function chargerListe() {
+    const reponse = await fetch('/api/sorties/fil');
+    const etatApi = document.getElementById('etat-api');
+
+    if (!reponse.ok) { etatApi.textContent = '✗ API indisponible'; return; }
+    etatApi.textContent = '✓ API en ligne';
+
+    cacheSorties = await reponse.json();
+    const sorties = cacheSorties.map(r => r.sortie);
+
+    document.getElementById('badge-sorties').textContent = `${sorties.length} résultat(s)`;
+
+    // Sommes simples uniquement : la vitesse ascensionnelle ne se moyenne pas
+    // entre sorties (poids différents), donc elle n'apparaît pas ici — voir
+    // CLAUDE.MD sur ce point précis.
+    document.getElementById('instrument-sorties').textContent = sorties.length;
+    document.getElementById('instrument-distance').innerHTML =
+        `${sorties.reduce((s, x) => s + x.distanceKm, 0).toFixed(1)}<small>km</small>`;
+    document.getElementById('instrument-dplus').innerHTML =
+        `${sorties.reduce((s, x) => s + x.denivelePositif, 0).toFixed(0)}<small>m</small>`;
+    document.getElementById('instrument-dmoins').innerHTML =
+        `${sorties.reduce((s, x) => s + x.deniveleNegatif, 0).toFixed(0)}<small>m</small>`;
+
+    const distanceTotale = sorties.reduce((s, x) => s + x.distanceKm, 0);
+    const dureeMouvementTotale = sorties.reduce((s, x) => s + (x.dureeMouvementMin || 0), 0);
+    const vitesseGlobale = dureeMouvementTotale > 0 ? distanceTotale / (dureeMouvementTotale / 60) : null;
+    document.getElementById('instrument-allure').innerHTML =
+        vitesseGlobale ? `${formaterAllure(vitesseGlobale)}<small>/km</small>` : '—';
+
+    creerBarreFiltres(document.getElementById('filtres-sorties-tags'), sorties, filtresSortiesActifs, afficherFilSorties);
+    afficherFilSorties();
+
+    remplirSelectSorties(sorties);
+    chargerCarteParcs();
+}
+
+function afficherFilSorties() {
+    const terme = document.getElementById('filtre-sorties').value.trim().toLowerCase();
+    const tri = document.getElementById('tri-sorties').value;
+
+    const comparateurs = {
+        'date-desc': (a, b) => (b.sortie.dateDebut || '').localeCompare(a.sortie.dateDebut || ''),
+        'date-asc': (a, b) => (a.sortie.dateDebut || '').localeCompare(b.sortie.dateDebut || ''),
+        'distance-desc': (a, b) => b.sortie.distanceKm - a.sortie.distanceKm,
+        'denivele-desc': (a, b) => b.sortie.denivelePositif - a.sortie.denivelePositif,
+    };
+
+    const visibles = cacheSorties
+        .filter(r => entiteCorrespondAuxFiltres(r.sortie, filtresSortiesActifs)
+            && (terme.length === 0 || r.sortie.nom.toLowerCase().includes(terme)))
+        .sort(comparateurs[tri]);
+
+    document.getElementById('fil-sorties').innerHTML = visibles.map(carteSortieHtml).join('');
+
+    document.querySelectorAll('.sortie-carte').forEach(carte =>
+        carte.addEventListener('click', () => afficherDetail(carte.dataset.id)));
+}
+
+document.getElementById('filtre-sorties').addEventListener('input', afficherFilSorties);
+document.getElementById('tri-sorties').addEventListener('change', afficherFilSorties);
+
+// Coordonnées de tuile Web Mercator (même projection que les tuiles OSM/
+// Leaflet) — nécessaire pour que le tracé SVG se superpose exactement au
+// fond de carte, pas une approximation "plate" indépendante de lui.
+function tuileX(lon, zoom) { return (lon + 180) / 360 * 2 ** zoom; }
+function tuileY(lat, zoom) {
+    const latRad = lat * Math.PI / 180;
+    return (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * 2 ** zoom;
+}
+
+// Le zoom le plus élevé (donc le plus détaillé) pour lequel l'emprise du
+// tracé tient dans ~150 px — une bonne marge dans la grille de 2×2 tuiles
+// (512 px de côté au total, x0/y0 centrés à ±128 px près, voir plus bas) :
+// même dans le pire cas, 150/2 + 128 = 203 px < 256 px, le tracé reste visible.
+function choisirZoom(minLat, maxLat, minLon, maxLon) {
+    for (let z = 17; z >= 3; z--) {
+        const largeur = (tuileX(maxLon, z) - tuileX(minLon, z)) * 256;
+        const hauteur = (tuileY(minLat, z) - tuileY(maxLat, z)) * 256;
+        if (largeur <= 150 && hauteur <= 150) return z;
+    }
+    return 3;
+}
+
+// Croquis avec un vrai fond de carte : une grille de 2×2 tuiles OSM (pas de
+// Leaflet — une carte interactive par sortie du fil serait beaucoup trop
+// lourde) positionnées en %, avec le tracé en SVG superposé sur la même
+// grille de coordonnées — les deux restent alignés quelle que soit la
+// taille réelle de la vignette à l'écran.
+function croquisAvecFond(points) {
+    if (!points || points.length < 2) return '<span>Pas de tracé GPS</span>';
+
+    const lats = points.map(p => p.lat), lons = points.map(p => p.lon);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+
+    const zoom = choisirZoom(minLat, maxLat, minLon, maxLon);
+    const centreX = (tuileX(minLon, zoom) + tuileX(maxLon, zoom)) / 2;
+    const centreY = (tuileY(maxLat, zoom) + tuileY(minLat, zoom)) / 2;
+    // Arrondi, pas troncature : on veut que centreX/centreY tombe au milieu
+    // de la grille de 2 tuiles (x0+1), pas n'importe où dedans — une simple
+    // Math.floor() peut décaler le tracé jusqu'à une tuile entière de trop.
+    const x0 = Math.round(centreX) - 1;
+    const y0 = Math.round(centreY) - 1;
+
+    const tuiles = [];
+    for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+            const url = `https://tile.openstreetmap.org/${zoom}/${x0 + dx}/${y0 + dy}.png`;
+            tuiles.push(`<img src="${url}" style="left:${dx * 50}%; top:${dy * 50}%;" loading="lazy" alt="">`);
+        }
+    }
+
+    const tracePoints = points.map(p => {
+        const x = (tuileX(p.lon, zoom) - x0) / 2 * 100;
+        const y = (tuileY(p.lat, zoom) - y0) / 2 * 100;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(' ');
+
+    return `
+        <div class="croquis-tuiles">${tuiles.join('')}</div>
+        <svg class="croquis-trace" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <polyline points="${tracePoints}" style="fill:none; stroke:var(--accent); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;"/>
+        </svg>
+        <span class="croquis-attribution">© OSM</span>`;
+}
+
+function carteSortieHtml(resume) {
+    const s = resume.sortie;
+    const vitesseMoyenne = s.dureeMouvementMin ? s.distanceKm / (s.dureeMouvementMin / 60) : null;
+
+    const photosHtml = resume.photos.length
+        ? `<div class="sortie-carte-photos">${resume.photos.map(p => `<img src="${p.url}" alt="${p.nomFichier}" loading="lazy">`).join('')}</div>`
+        : '';
+
+    return `
+    <div class="sortie-carte" data-id="${s.id}">
+        <div class="sortie-carte-croquis">${croquisAvecFond(resume.apercu)}</div>
+        <div class="sortie-carte-corps">
+            <div>
+                <div class="sortie-carte-titre">${s.nom}</div>
+                <span class="sortie-carte-periode">${formaterPeriode(s.dateDebut, s.dateFin)} · ${s.nombreTraces} trace(s)</span>
+            </div>
+            ${photosHtml}
+            <div class="sortie-carte-stats">
+                <div class="mini-instrument"><span class="valeur">${s.distanceKm.toFixed(1)}<small>km</small></span><span class="tag">Distance</span></div>
+                <div class="mini-instrument"><span class="valeur">${s.denivelePositif.toFixed(0)}<small>m</small></span><span class="tag">D+</span></div>
+                <div class="mini-instrument"><span class="valeur">${s.deniveleNegatif.toFixed(0)}<small>m</small></span><span class="tag">D−</span></div>
+                <div class="mini-instrument"><span class="valeur">${vitesseMoyenne ? formaterAllure(vitesseMoyenne) : '—'}<small>/km</small></span><span class="tag">Allure</span></div>
+            </div>
+            ${pucesTagsEtDisciplines(s)}
+        </div>
+    </div>`;
+}
+
+// ── Carte des parcs fréquentés ──────────────────────────────────
+
+let carteParcs = null;
+let coucheParcs = null;
+let contoursParcsCache = null;
+
+/// <summary>
+/// Carte choroplèthe : un parc est d'autant plus foncé qu'on y a parcouru de
+/// distance. Les contours (GeoJSON statique) ne sont récupérés qu'une fois ;
+/// les statistiques, elles, sont rechargées à chaque appel pour rester à jour
+/// après un ajout.
+/// </summary>
+async function chargerCarteParcs() {
+    if (!contoursParcsCache) {
+        contoursParcsCache = await fetch('/data/parcs.json').then(r => r.json());
+    }
+
+    const reponse = await fetch('/api/parcs');
+    const stats = reponse.ok ? await reponse.json() : [];
+    const statsParNom = Object.fromEntries(stats.map(s => [s.nom, s]));
+    const distanceMax = Math.max(1, ...stats.map(s => s.distanceKm));
+
+    if (!carteParcs) {
+        carteParcs = L.map('carte-parcs').setView([46.6, 2.5], 5.3);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 12,
+        }).addTo(carteParcs);
+    } else {
+        carteParcs.invalidateSize();
+    }
+
+    if (coucheParcs) carteParcs.removeLayer(coucheParcs);
+
+    coucheParcs = L.geoJSON(contoursParcsCache, {
+        style: entite => {
+            const s = statsParNom[entite.properties.toponyme];
+            // Racine carrée : sans elle, une seule sortie dans un grand parc
+            // paraîtrait presque invisible à côté d'un parc très fréquenté.
+            const intensite = s ? Math.sqrt(s.distanceKm / distanceMax) : 0;
+            return {
+                color: '#3c4a45',
+                weight: 1,
+                fillColor: '#119e7d',
+                fillOpacity: s ? 0.1 + intensite * 0.75 : 0.03,
+            };
+        },
+        onEachFeature: (entite, couche) => {
+            const s = statsParNom[entite.properties.toponyme];
+            couche.bindTooltip(s
+                ? `${entite.properties.toponyme} — ${s.distanceKm.toFixed(1)} km sur ${s.nombreTraces} trace(s) — cliquer pour comparer`
+                : entite.properties.toponyme);
+            couche.on('click', () => afficherParc(entite.properties.toponyme));
+        },
+    }).addTo(carteParcs);
+}
+
+// ── Détail d'un parc : ses traces côte à côte, pour comparer ──────
+
+// Nom du parc actuellement affiché — permet au bouton retour de la page
+// Trace d'y revenir quand on y est arrivé depuis cette page.
+let parcCourant = null;
+
+async function afficherParc(nom) {
+    const reponse = await fetch(`/api/parcs/${encodeURIComponent(nom)}`);
+    if (!reponse.ok) return;
+
+    const sorties = await reponse.json();
+    parcCourant = nom;
+
+    document.getElementById('instrument-parc-traces').textContent =
+        sorties.reduce((s, x) => s + x.nombreTraces, 0);
+    document.getElementById('instrument-parc-distance').innerHTML =
+        `${sorties.reduce((s, x) => s + x.distanceKm, 0).toFixed(1)}<small>km</small>`;
+    document.getElementById('instrument-parc-dplus').innerHTML =
+        `${sorties.reduce((s, x) => s + x.denivelePositif, 0).toFixed(0)}<small>m</small>`;
+    document.getElementById('instrument-parc-dmoins').innerHTML =
+        `${sorties.reduce((s, x) => s + x.deniveleNegatif, 0).toFixed(0)}<small>m</small>`;
+
+    // Comptes et distances limités aux traces qui tombent dans ce parc — une
+    // sortie ayant aussi des traces ailleurs n'apparaît ici que pour celles-ci.
+    document.getElementById('corps-parc').innerHTML = sorties.map(s => `
+        <tr class="ligne-cliquable" data-id="${s.sortieId}">
+            <td class="nom-sortie">${s.sortieNom}</td>
+            <td>${s.nombreTraces}</td>
+            <td class="num">${s.distanceKm.toFixed(2)} km</td>
+            <td class="num positif">+${s.denivelePositif.toFixed(0)} m</td>
+            <td class="num negatif">−${s.deniveleNegatif.toFixed(0)} m</td>
+        </tr>`).join('');
+
+    document.querySelectorAll('#corps-parc tr').forEach(ligne =>
+        ligne.addEventListener('click', () => afficherDetail(ligne.dataset.id)));
+
+    ouvrirPage('parc', nom);
+}
+
+// ── Détail d'une sortie : traces + carte + graphiques, tout de suite ────
+
+// Sortie actuellement affichée en détail — alimente les boutons renommer/
+// supprimer, qui n'ont sinon aucun moyen de savoir de quelle sortie il s'agit.
+let sortieCourante = null;
+
+async function afficherDetail(id) {
+    const reponse = await fetch(`/api/sorties/${id}`);
+    if (!reponse.ok) return;
+
+    const { sortie, traces, photos } = await reponse.json();
+    sortieCourante = sortie.id;
+
+    document.getElementById('titre-detail').textContent = sortie.nom;
+    document.getElementById('badge-detail').textContent = formaterPeriode(sortie.dateDebut, sortie.dateFin);
+    document.getElementById('champ-tags-sortie').value = (sortie.tags || []).join(', ');
+
+    document.getElementById('instrument-sortie-distance').innerHTML = `${sortie.distanceKm.toFixed(1)}<small>km</small>`;
+    document.getElementById('instrument-sortie-dplus').innerHTML = `${sortie.denivelePositif.toFixed(0)}<small>m</small>`;
+    document.getElementById('instrument-sortie-dmoins').innerHTML = `${sortie.deniveleNegatif.toFixed(0)}<small>m</small>`;
+    document.getElementById('instrument-sortie-vitesse').innerHTML =
+        sortie.vitesseAscensionnelle ? `${sortie.vitesseAscensionnelle.toFixed(0)}<small>m/h</small>` : '—';
+    const vitesseSortie = sortie.dureeMouvementMin ? sortie.distanceKm / (sortie.dureeMouvementMin / 60) : null;
+    document.getElementById('instrument-sortie-allure').innerHTML =
+        vitesseSortie ? `${formaterAllure(vitesseSortie)}<small>/km</small>` : '—';
+
+    document.getElementById('corps-traces-detail').innerHTML = traces.map(t => `
+        <tr>
+            <td class="nom-sortie">${t.nom}</td>
+            <td>${t.date ? t.date.slice(0, 10) : '—'}</td>
+            <td class="num">${t.distanceKm.toFixed(2)} km</td>
+            <td class="num positif">+${t.denivelePositif.toFixed(0)} m</td>
+            <td class="num negatif">−${t.deniveleNegatif.toFixed(0)} m</td>
+            <td>
+                <button class="bouton-discret bouton-detail-trace" data-id="${t.id}" type="button">ℹ</button>
+                <button class="bouton-discret bouton-renommer-trace" data-id="${t.id}" data-nom="${t.nom}" type="button">✎</button>
+                <button class="bouton-discret bouton-supprimer-trace" data-id="${t.id}" data-nom="${t.nom}" type="button">🗑</button>
+            </td>
+        </tr>`).join('');
+
+    document.querySelectorAll('#corps-traces-detail .bouton-detail-trace').forEach(bouton =>
+        bouton.addEventListener('click', () => afficherDetailTrace(bouton.dataset.id, 'detail')));
+    document.querySelectorAll('.bouton-renommer-trace').forEach(bouton =>
+        bouton.addEventListener('click', () => renommerTrace(bouton.dataset.id, bouton.dataset.nom)));
+    document.querySelectorAll('.bouton-supprimer-trace').forEach(bouton =>
+        bouton.addEventListener('click', () => supprimerTrace(bouton.dataset.id, bouton.dataset.nom)));
+
+    ouvrirPage('detail', sortie.nom);
+    afficherTraces(traces);
+    afficherPhotos(photos);
+}
+
+// ── Photos souvenirs d'une sortie ─────────────────────────────────
+
+function afficherPhotos(photos) {
+    document.getElementById('badge-photos').textContent = `${photos.length} photo(s)`;
+
+    const vignettes = photos.map(p => `
+        <div class="photo-vignette" data-id="${p.id}" data-url="${p.url}" data-nom="${p.nomFichier}">
+            <img src="${p.url}" alt="${p.nomFichier}" loading="lazy">
+        </div>`).join('');
+
+    document.getElementById('grille-photos').innerHTML = `
+        ${vignettes}
+        <label class="photo-ajout">
+            + Ajouter
+            <input type="file" id="champ-photos" accept="image/*" multiple hidden>
+        </label>`;
+
+    document.querySelectorAll('.photo-vignette').forEach(vignette =>
+        vignette.addEventListener('click', () =>
+            ouvrirPhoto(Number(vignette.dataset.id), vignette.dataset.url, vignette.dataset.nom,
+                `/api/photos/${vignette.dataset.id}`, () => afficherDetail(sortieCourante))));
+
+    document.getElementById('champ-photos').addEventListener('change', async evenement => {
+        const fichiers = evenement.target.files;
+        if (fichiers.length === 0) return;
+
+        const donnees = new FormData();
+        for (const fichier of fichiers) donnees.append('fichiers', fichier);
+
+        await fetch(`/api/sorties/${sortieCourante}/photos`, { method: 'POST', body: donnees });
+        afficherDetail(sortieCourante);
+    });
+}
+
+// Visionneuse partagée par les photos de sortie et les photos de matériel —
+// routeSuppression et actualiser varient selon le domaine d'où on l'ouvre.
+let contextePhoto = null;
+
+function ouvrirPhoto(id, url, nom, routeSuppression, actualiser) {
+    contextePhoto = { routeSuppression, actualiser };
+    document.getElementById('titre-modale-photo').textContent = nom;
+    document.getElementById('image-modale-photo').src = url;
+    document.getElementById('image-modale-photo').alt = nom;
+    document.getElementById('voile-photo').classList.add('ouvert');
+}
+
+document.getElementById('fermer-photo').addEventListener('click', () =>
+    document.getElementById('voile-photo').classList.remove('ouvert'));
+
+document.getElementById('bouton-supprimer-photo').addEventListener('click', async () => {
+    if (!confirm('Supprimer cette photo ?')) return;
+
+    await fetch(contextePhoto.routeSuppression, { method: 'DELETE' });
+    document.getElementById('voile-photo').classList.remove('ouvert');
+    contextePhoto.actualiser();
+});
+
+async function renommerTrace(id, nomActuel) {
+    const nouveauNom = prompt('Nouveau nom de la trace :', nomActuel);
+    if (!nouveauNom || !nouveauNom.trim() || nouveauNom.trim() === nomActuel) return;
+
+    const reponse = await fetch(`/api/traces/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: nouveauNom.trim() }),
+    });
+
+    if (reponse.ok) afficherDetail(sortieCourante);
+    else alert(await reponse.text() || 'Renommage impossible.');
+}
+
+async function supprimerTrace(id, nom) {
+    if (!confirm(`Supprimer la trace « ${nom} » ?`)) return;
+
+    await fetch(`/api/traces/${id}`, { method: 'DELETE' });
+    afficherDetail(sortieCourante);
+}
+
+// ── Détail complet d'une trace (fiche technique) ──────────────────
+
+function formaterDuree(minutes) {
+    if (minutes == null) return '—';
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return `${h} h ${String(m).padStart(2, '0')} min`;
+}
+
+// Allure : l'inverse de la vitesse, en minutes:secondes par km — plus parlant
+// qu'une vitesse en km/h pour se caler sur un rythme de marche.
+function formaterAllure(vitesseKmh) {
+    if (!vitesseKmh) return '—';
+    const minParKm = 60 / vitesseKmh;
+    const m = Math.floor(minParKm);
+    const s = Math.round((minParKm - m) * 60);
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+// D'où vient-on sur la page Trace ? Détermine où renvoie le bouton retour.
+// La page Parc n'existe pas encore à ce point du fichier : parcCourant est
+// déclaré plus bas, avec la section Parcs.
+let origineTraceDetail = 'historique';
+
+// Sortie de la trace actuellement affichée — alimente le bouton "Voir la
+// sortie", disponible même quand on n'est pas venu de la page Détail.
+let sortieDeLaTraceCourante = null;
+
+// Id de la trace elle-même — nécessaire pour la réaffecter à une autre sortie.
+let traceCourante = null;
+
+async function afficherDetailTrace(id, origine) {
+    origineTraceDetail = origine ?? 'historique';
+    traceCourante = id;
+
+    const reponse = await fetch(`/api/traces/${id}`);
+    if (!reponse.ok) return;
+
+    const t = await reponse.json();
+    sortieDeLaTraceCourante = t.sortieId;
+    document.getElementById('lien-sortie-nom').textContent = t.sortieNom;
+
+    const vitesseMoyenne = t.dureeMouvementMin ? t.distanceKm / (t.dureeMouvementMin / 60) : null;
+    const pauses = (t.dureeTotaleMin != null && t.dureeMouvementMin != null)
+        ? t.dureeTotaleMin - t.dureeMouvementMin : null;
+
+    document.getElementById('fiche-detail-trace').innerHTML = `
+        <dt>Date</dt><dd>${t.date ? t.date.slice(0, 16) : 'inconnue'}</dd>
+        <dt>Sortie</dt><dd>${t.sortieNom}</dd>
+        <dt>Source</dt><dd>${t.source}</dd>
+        <dt>Distance</dt><dd>${t.distanceKm.toFixed(2)} km</dd>
+        <dt>Altitude</dt><dd>${t.altitudeMin.toFixed(0)} → ${t.altitudeMax.toFixed(0)} m</dd>
+        <dt>Dénivelé</dt><dd>+${t.denivelePositif.toFixed(0)} m / −${t.deniveleNegatif.toFixed(0)} m</dd>
+        <dt>Pente max</dt><dd>montée ${(t.penteMaxMontee * 100).toFixed(1)} % / descente ${(t.penteMaxDescente * 100).toFixed(1)} %</dd>
+        <dt>Durée totale</dt><dd>${formaterDuree(t.dureeTotaleMin)}</dd>
+        <dt>Durée en mouvement</dt><dd>${formaterDuree(t.dureeMouvementMin)}${pauses ? ` (${Math.round(pauses)} min de pause)` : ''}</dd>
+        <dt>Vitesse moyenne</dt><dd>${vitesseMoyenne ? vitesseMoyenne.toFixed(1) + ' km/h' : '—'}</dd>
+        <dt>Allure moyenne</dt><dd>${vitesseMoyenne ? formaterAllure(vitesseMoyenne) + ' /km' : '—'}</dd>
+        <dt>Vitesse ascensionnelle</dt><dd>${t.vitesseAscensionnelle ? t.vitesseAscensionnelle.toFixed(0) + ' m/h' : '—'}</dd>
+        <dt>Seuils utilisés</dt><dd>dénivelé ${t.seuilDenivele.toFixed(1)} m, vitesse ${t.seuilVitesse.toFixed(2)} m/s</dd>
+        <dt>Fichier</dt><dd>${t.fichier}</dd>
+    `;
+
+    ouvrirPage('trace', t.nom);
+    afficherTraceUnique(id, t.nom);
+}
+
+document.getElementById('bouton-retour-trace').addEventListener('click', () => {
+    if (origineTraceDetail === 'detail') ouvrirPage('detail', document.getElementById('titre-detail').textContent);
+    else if (origineTraceDetail === 'parc') ouvrirPage('parc', parcCourant);
+    else ouvrirPage('historique');
+});
+
+document.getElementById('bouton-voir-sortie').addEventListener('click', () => afficherDetail(sortieDeLaTraceCourante));
+
+// ── Déplacer une trace vers une autre sortie ──────────────────────
+
+document.getElementById('bouton-deplacer-trace').addEventListener('click', async () => {
     const reponse = await fetch('/api/sorties');
     const sorties = await reponse.json();
 
-    document.getElementById('liste').innerHTML = sorties.map(sortie => `<li>${sortie.nom} - ${sortie.dateDebut}</li>`).join('');
+    document.getElementById('select-nouvelle-sortie-trace').innerHTML =
+        sorties.map(s => `<option value="${s.id}" ${s.id === sortieDeLaTraceCourante ? 'selected' : ''}>${s.nom}</option>`).join('');
+    document.getElementById('message-deplacement').textContent = '';
+
+    document.getElementById('voile-deplacer-trace').classList.add('ouvert');
+});
+
+document.getElementById('fermer-deplacer-trace').addEventListener('click', () =>
+    document.getElementById('voile-deplacer-trace').classList.remove('ouvert'));
+
+document.getElementById('bouton-confirmer-deplacement').addEventListener('click', async () => {
+    const nouvelleSortieId = Number(document.getElementById('select-nouvelle-sortie-trace').value);
+
+    if (nouvelleSortieId === sortieDeLaTraceCourante) {
+        document.getElementById('voile-deplacer-trace').classList.remove('ouvert');
+        return;
+    }
+
+    const reponse = await fetch(`/api/traces/${traceCourante}/sortie`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sortieId: nouvelleSortieId }),
+    });
+
+    if (!reponse.ok) {
+        document.getElementById('message-deplacement').textContent = await reponse.text() || 'Déplacement impossible.';
+        return;
+    }
+
+    document.getElementById('voile-deplacer-trace').classList.remove('ouvert');
+    afficherDetailTrace(traceCourante, origineTraceDetail);
+});
+
+// ── Carte et graphiques d'une trace seule (page Détail de trace) ──
+//
+// Survoler l'altitude ou la pente déplace un repère sur la carte, à
+// l'endroit exact du parcours correspondant (façon Strava). Ça ne marche
+// que parce que /profil renvoie maintenant lat/lon/temps avec chaque point :
+// même tableau pour le graphique et la carte, donc les index se correspondent
+// forcément — plus besoin de recaler deux requêtes séparées entre elles.
+
+let carteTraceLeaflet = null;
+let coucheTrace = null;
+let graphiqueAltitudeTrace = null;
+let graphiquePenteTrace = null;
+
+// Ligne verticale en pointillés à la position survolée, dans le style des
+// relevés d'instruments plutôt que le curseur par défaut de Chart.js.
+const curseurVertical = {
+    id: 'curseurVertical',
+    afterDraw(chart) {
+        const actifs = chart.tooltip?.getActiveElements();
+        if (!actifs || actifs.length === 0) return;
+
+        const { x } = actifs[0].element;
+        const { top, bottom } = chart.chartArea;
+        const ctx = chart.ctx;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, bottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = '#119e7d';
+        ctx.stroke();
+        ctx.restore();
+    },
+};
+Chart.register(curseurVertical);
+
+// Repère qui suit le survol d'un graphique sur la carte correspondante —
+// un suivi par carte (trace seule / sortie à plusieurs traces), chacun avec
+// son propre marqueur. `getCarte` est un accesseur car la carte Leaflet
+// n'existe parfois pas encore au moment où le suivi est créé.
+function creerSuiviCarte(getCarte) {
+    let marqueur = null;
+    return {
+        afficher(point) {
+            const carte = getCarte();
+            if (!carte || point.lat == null || point.lon == null) return;
+
+            if (!marqueur) {
+                marqueur = L.circleMarker([point.lat, point.lon], {
+                    radius: 7, weight: 2, color: '#119e7d', fillColor: '#fff', fillOpacity: 1,
+                }).addTo(carte);
+            } else {
+                marqueur.setLatLng([point.lat, point.lon]);
+            }
+        },
+        masquer() {
+            if (marqueur) { marqueur.remove(); marqueur = null; }
+        },
+    };
 }
-charger();
+
+const suiviCarteTrace = creerSuiviCarte(() => carteTraceLeaflet);
+const suiviCarteSortie = creerSuiviCarte(() => carteLeaflet);
+const suiviInactif = { afficher() {}, masquer() {} }; // pour le graphique agrandi, sans carte
+
+// Allure locale autour d'un point (moyenne sur une petite fenêtre pour
+// lisser le bruit GPS), en km/h — à convertir avec formaterAllure().
+function allureLocale(profil, index) {
+    const rayon = 2;
+    const a = profil[Math.max(0, index - rayon)];
+    const b = profil[Math.min(profil.length - 1, index + rayon)];
+    if (!a.temps || !b.temps || a === b) return null;
+
+    const dureeS = (new Date(b.temps) - new Date(a.temps)) / 1000;
+    const distanceM = b.distanceCumulee - a.distanceCumulee;
+    if (dureeS <= 0 || distanceM <= 0) return null;
+
+    const vitesseKmh = (distanceM / dureeS) * 3.6;
+    return vitesseKmh >= 0.36 ? vitesseKmh : null; // < 0.1 m/s : assimilé à une pause
+}
+
+// Étend optionsGraphique() avec l'info-bulle enrichie (dist/alt/pente/allure)
+// et la synchronisation avec une carte. `jeux` est toujours un tableau, même
+// pour une trace seule — une sortie à plusieurs traces y met plusieurs jeux
+// mis bout à bout sur l'axe des distances (voir afficherTraces).
+function optionsGraphiqueInteractif(titreAxeY, jeux, suivi) {
+    const options = optionsGraphique(titreAxeY);
+
+    // 'nearest' + intersect:false + axis:'x' : peu importe le pixel exact du
+    // tracé (points invisibles, pointRadius: 0) ou le jeu de données visé —
+    // le point le plus proche du curseur sur l'axe des distances est trouvé,
+    // même quand les jeux ne se superposent pas (mis bout à bout).
+    options.interaction = { mode: 'nearest', intersect: false, axis: 'x' };
+
+    options.onHover = (_event, elements) => {
+        if (elements.length === 0) { suivi.masquer(); return; }
+        const { datasetIndex, index } = elements[0];
+        suivi.afficher(jeux[datasetIndex].profil[index]);
+    };
+
+    options.plugins.tooltip = {
+        callbacks: {
+            title: (items) => {
+                const j = jeux[items[0].datasetIndex];
+                const p = j.profil[items[0].dataIndex];
+                const distance = ((p.distanceCumulee + (j.decalageDistance ?? 0)) / 1000).toFixed(2);
+                return jeux.length > 1 ? `${j.nom} — ${distance} km` : `Distance : ${distance} km`;
+            },
+            label: (item) => {
+                const j = jeux[item.datasetIndex];
+                const p = j.profil[item.dataIndex];
+                const lignes = [
+                    `Altitude : ${p.altitude.toFixed(0)} m`,
+                    `Pente : ${(p.pente * 100).toFixed(1)} %`,
+                ];
+                const allure = allureLocale(j.profil, item.dataIndex);
+                if (allure) lignes.push(`Allure : ${formaterAllure(allure)} /km`);
+                return lignes;
+            },
+        },
+    };
+
+    return options;
+}
+
+async function afficherTraceUnique(id, nom) {
+    document.getElementById('message-visualisation-trace').textContent = 'Chargement…';
+    document.getElementById('carte-trace').style.display = 'none';
+
+    const profilReponse = await fetch(`/api/traces/${id}/profil`);
+
+    const jeu = {
+        nom,
+        couleur: PALETTE[0],
+        profil: profilReponse.ok ? await profilReponse.json() : [],
+    };
+
+    // Le graphique agrandi (modale partagée) lit toujours ce même tableau,
+    // quelle que soit la page qui l'a rempli en dernier.
+    jeuxCourants = [jeu];
+
+    dessinerCarteTrace(jeu);
+
+    if (graphiqueAltitudeTrace) graphiqueAltitudeTrace.destroy();
+    graphiqueAltitudeTrace = new Chart(document.getElementById('graphique-altitude-trace'),
+        { type: 'line', data: { datasets: construireDatasets([jeu], p => p.altitude) }, options: optionsGraphiqueInteractif('Altitude (m)', [jeu], suiviCarteTrace) });
+
+    if (graphiquePenteTrace) graphiquePenteTrace.destroy();
+    graphiquePenteTrace = new Chart(document.getElementById('graphique-pente-trace'),
+        { type: 'line', data: { datasets: construireDatasets([jeu], p => p.pente * 100) }, options: optionsGraphiqueInteractif('Pente (%)', [jeu], suiviCarteTrace) });
+}
+
+function dessinerCarteTrace(jeu) {
+    const messageCarte = document.getElementById('message-visualisation-trace');
+    const carteDiv = document.getElementById('carte-trace');
+
+    const points = jeu.profil.filter(p => p.lat != null && p.lon != null);
+
+    if (points.length === 0) {
+        messageCarte.textContent =
+            'Coordonnées non disponibles (trace archivée avant l\'ajout de la carte — réimportez le GPX pour les obtenir).';
+        carteDiv.style.display = 'none';
+        return;
+    }
+
+    messageCarte.textContent = '';
+    carteDiv.style.display = 'block';
+
+    if (!carteTraceLeaflet) {
+        carteTraceLeaflet = L.map('carte-trace');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19,
+        }).addTo(carteTraceLeaflet);
+    }
+
+    carteTraceLeaflet.invalidateSize();
+
+    if (coucheTrace) carteTraceLeaflet.removeLayer(coucheTrace);
+    coucheTrace = L.polyline(points.map(p => [p.lat, p.lon]), { color: jeu.couleur }).addTo(carteTraceLeaflet);
+
+    carteTraceLeaflet.fitBounds(coucheTrace.getBounds());
+    suiviCarteTrace.masquer();
+}
+
+document.getElementById('graphique-altitude-trace').addEventListener('mouseleave', () => suiviCarteTrace.masquer());
+document.getElementById('graphique-pente-trace').addEventListener('mouseleave', () => suiviCarteTrace.masquer());
+
+document.getElementById('bouton-agrandir-altitude-trace').addEventListener('click', () => agrandirGraphique('altitude'));
+document.getElementById('bouton-agrandir-pente-trace').addEventListener('click', () => agrandirGraphique('pente'));
+
+document.getElementById('bouton-renommer-sortie').addEventListener('click', async () => {
+    const nouveauNom = prompt('Nouveau nom de la sortie :', document.getElementById('titre-detail').textContent);
+    if (!nouveauNom || !nouveauNom.trim()) return;
+
+    const reponse = await fetch(`/api/sorties/${sortieCourante}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom: nouveauNom.trim() }),
+    });
+
+    if (reponse.ok) afficherDetail(sortieCourante);
+});
+
+document.getElementById('bouton-supprimer-sortie').addEventListener('click', async () => {
+    if (!confirm('Supprimer cette sortie et toutes ses traces ?')) return;
+
+    await fetch(`/api/sorties/${sortieCourante}`, { method: 'DELETE' });
+    ouvrirPage('sorties');
+    chargerListe();
+});
+
+document.getElementById('bouton-enregistrer-tags-sortie').addEventListener('click', async () => {
+    const tags = listeDepuisChamp(document.getElementById('champ-tags-sortie').value);
+
+    await fetch(`/api/sorties/${sortieCourante}/tags`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags }),
+    });
+});
+
+// ── Historique global ──────────────────────────────────────────
+
+async function chargerHistorique() {
+    const reponse = await fetch('/api/traces');
+    if (!reponse.ok) return;
+
+    const traces = await reponse.json();
+    document.getElementById('badge-historique').textContent = `${traces.length} trace(s)`;
+
+    document.getElementById('corps-historique').innerHTML = traces.map(t => `
+        <tr>
+            <td class="nom-sortie">${t.nom}</td>
+            <td>${t.sortieNom}</td>
+            <td class="num">${t.distanceKm.toFixed(2)} km</td>
+            <td class="num positif">+${t.denivelePositif.toFixed(0)} m</td>
+            <td class="num negatif">−${t.deniveleNegatif.toFixed(0)} m</td>
+            <td><button class="bouton-discret bouton-detail-trace" data-id="${t.id}" type="button">ℹ</button></td>
+        </tr>`).join('');
+
+    document.querySelectorAll('#corps-historique .bouton-detail-trace').forEach(bouton =>
+        bouton.addEventListener('click', () => afficherDetailTrace(bouton.dataset.id, 'historique')));
+}
+
+// ── Prédiction : durée estimée d'une trace pas encore parcourue ──
+
+async function chargerModeleVitesse() {
+    const reponse = await fetch('/api/modele-vitesse');
+    if (!reponse.ok) return;
+
+    const modele = await reponse.json();
+    document.getElementById('badge-modele').textContent = `${modele.nombreSegments} échantillon(s)`;
+
+    document.getElementById('corps-modele').innerHTML = modele.tranches.map(t => `
+        <tr>
+            <td>${(t.penteMin * 100).toFixed(0)} % → ${(t.penteMax * 100).toFixed(0)} %</td>
+            <td class="num">${t.vitesseMoyenneKmh != null ? t.vitesseMoyenneKmh.toFixed(1) + ' km/h' : '—'}</td>
+            <td class="num">${t.nombreEchantillons}</td>
+        </tr>`).join('');
+}
+
+document.getElementById('champ-fichier-prediction').addEventListener('change', async () => {
+    const fichiers = document.getElementById('champ-fichier-prediction').files;
+    const conteneur = document.getElementById('resultat-prediction');
+
+    if (fichiers.length === 0) { conteneur.innerHTML = ''; return; }
+
+    conteneur.innerHTML = '<p class="message">Analyse en cours…</p>';
+
+    const donnees = new FormData();
+    donnees.append('fichier', fichiers[0]);
+
+    const reponse = await fetch('/api/prediction', { method: 'POST', body: donnees });
+
+    if (!reponse.ok) {
+        conteneur.innerHTML = `<p class="badge-resultat badge-erreur">✗ ${await reponse.text()}</p>`;
+        return;
+    }
+
+    const p = await reponse.json();
+
+    const dureeTexte = p.dureeEstimeeMin != null
+        ? formaterDuree(p.dureeEstimeeMin)
+        : 'non estimable — aucune donnée de vitesse archivée pour l\'instant';
+
+    const avertissement = p.dureeEstimeeMin != null && p.couverturePourcent < 50
+        ? `<p class="message">⚠ Seulement ${p.couverturePourcent.toFixed(0)} % du parcours couvert par des tranches de pente déjà rencontrées dans tes sorties — le reste retombe sur ta vitesse moyenne globale, estimation moins fiable.</p>`
+        : '';
+
+    conteneur.innerHTML = `
+        <dl class="fiche-trace" style="margin-top: 0.8rem;">
+            <dt>Trace</dt><dd>${p.nom}</dd>
+            <dt>Distance</dt><dd>${p.distanceKm.toFixed(2)} km</dd>
+            <dt>Dénivelé</dt><dd>+${p.denivelePositif.toFixed(0)} m / −${p.deniveleNegatif.toFixed(0)} m</dd>
+            <dt>Durée estimée</dt><dd>${dureeTexte}</dd>
+            <dt>Couverture du modèle</dt><dd>${p.couverturePourcent.toFixed(0)} % (sur ${p.nombreSegmentsModele} échantillons)</dd>
+        </dl>
+        ${avertissement}
+    `;
+});
+
+// ── Carte et graphiques (une ou plusieurs traces superposées) ────
+
+let carteLeaflet = null;
+let couchesCarte = [];
+let graphiqueAltitude = null;
+let graphiquePente = null;
+let graphiqueGrand = null;
+
+// Dernier jeu de données affiché, conservé pour reconstruire le graphique en
+// grand sans re-télécharger les profils.
+let jeuxCourants = [];
+
+/// <summary>
+/// Affiche la carte et les graphiques altitude/pente pour les traces
+/// données, une couleur distincte par trace (partagée entre carte, légende
+/// et graphiques). `traces` est un tableau de { id, nom }.
+/// </summary>
+async function afficherTraces(traces) {
+    document.getElementById('legende-visualisation').innerHTML = '';
+    document.getElementById('message-visualisation').textContent = 'Chargement…';
+    document.getElementById('carte').style.display = 'none';
+
+    const jeux = await Promise.all(traces.map(async (t, i) => {
+        const profilReponse = await fetch(`/api/traces/${t.id}/profil`);
+
+        return {
+            nom: t.nom,
+            couleur: PALETTE[i % PALETTE.length],
+            profil: profilReponse.ok ? await profilReponse.json() : [],
+        };
+    }));
+
+    // Les traces d'une même sortie racontent un seul parcours dans le temps
+    // (typiquement les jours d'un trek) : mises bout à bout sur l'axe des
+    // distances, pas superposées depuis 0 — une superposition n'aurait de
+    // sens que pour comparer des sorties différentes entre elles.
+    let distanceCumulee = 0;
+    for (const j of jeux) {
+        j.decalageDistance = distanceCumulee;
+        if (j.profil.length > 0) distanceCumulee += j.profil[j.profil.length - 1].distanceCumulee;
+    }
+
+    document.getElementById('legende-visualisation').innerHTML = jeux.map(j =>
+        `<li><span class="puce-legende" style="background:${j.couleur}"></span>${j.nom}</li>`).join('');
+
+    jeuxCourants = jeux;
+
+    dessinerCarte(jeux);
+    dessinerGraphique('graphique-altitude', jeux, 'Altitude (m)', p => p.altitude);
+    dessinerGraphique('graphique-pente', jeux, 'Pente (%)', p => p.pente * 100);
+}
+
+function dessinerCarte(jeux) {
+    const avecCoordonnees = jeux.filter(j => j.profil.some(p => p.lat != null && p.lon != null));
+    const messageCarte = document.getElementById('message-visualisation');
+    const carteDiv = document.getElementById('carte');
+
+    if (avecCoordonnees.length === 0) {
+        messageCarte.textContent =
+            'Coordonnées non disponibles (trace(s) archivée(s) avant l\'ajout de la carte — réimportez le GPX pour les obtenir).';
+        carteDiv.style.display = 'none';
+        return;
+    }
+
+    messageCarte.textContent = avecCoordonnees.length < jeux.length
+        ? `${jeux.length - avecCoordonnees.length} trace(s) sans coordonnées, non affichée(s) sur la carte.`
+        : '';
+    carteDiv.style.display = 'block';
+
+    // La carte Leaflet ne se crée qu'une fois : on réutilise la même instance,
+    // en ne remplaçant que les tracés à chaque affichage.
+    if (!carteLeaflet) {
+        carteLeaflet = L.map('carte');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19,
+        }).addTo(carteLeaflet);
+    }
+
+    // La carte doit être visible avant qu'on la redimensionne, sinon Leaflet
+    // calcule sa taille sur un conteneur encore masqué (grille de tuiles grises).
+    carteLeaflet.invalidateSize();
+
+    couchesCarte.forEach(couche => carteLeaflet.removeLayer(couche));
+    couchesCarte = avecCoordonnees.map(j =>
+        L.polyline(j.profil.filter(p => p.lat != null && p.lon != null).map(p => [p.lat, p.lon]), { color: j.couleur }).addTo(carteLeaflet));
+
+    carteLeaflet.fitBounds(L.featureGroup(couchesCarte).getBounds());
+    suiviCarteSortie.masquer();
+}
+
+function construireDatasets(jeux, valeur) {
+    return jeux.map(j => ({
+        label: j.nom,
+        data: j.profil.map(p => ({ x: (p.distanceCumulee + (j.decalageDistance ?? 0)) / 1000, y: valeur(p) })),
+        borderColor: j.couleur,
+        backgroundColor: j.couleur,
+        pointRadius: 0,
+        borderWidth: 1.5,
+        tension: 0.1,
+    }));
+}
+
+function optionsGraphique(titreAxeY) {
+    return {
+        animation: false,
+        maintainAspectRatio: false,
+        scales: {
+            x: { type: 'linear', title: { display: true, text: 'Distance (km)' }, grid: { color: '#e8ebe9' } },
+            y: { title: { display: true, text: titreAxeY }, grid: { color: '#e8ebe9' } },
+        },
+        plugins: {
+            zoom: {
+                zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+                pan: { enabled: true, mode: 'x' },
+            },
+        },
+    };
+}
+
+/// <summary>
+/// Un graphique Chart.js zoomable (molette + glisser sur l'axe des distances),
+/// une ligne par trace. `valeur` extrait la donnée à tracer d'un point de profil.
+/// </summary>
+function dessinerGraphique(idCanvas, jeux, titreAxeY, valeur) {
+    const config = { type: 'line', data: { datasets: construireDatasets(jeux, valeur) }, options: optionsGraphiqueInteractif(titreAxeY, jeux, suiviCarteSortie) };
+
+    if (idCanvas === 'graphique-altitude') {
+        if (graphiqueAltitude) graphiqueAltitude.destroy();
+        graphiqueAltitude = new Chart(document.getElementById(idCanvas), config);
+    } else {
+        if (graphiquePente) graphiquePente.destroy();
+        graphiquePente = new Chart(document.getElementById(idCanvas), config);
+    }
+}
+
+document.getElementById('graphique-altitude').addEventListener('mouseleave', () => suiviCarteSortie.masquer());
+document.getElementById('graphique-pente').addEventListener('mouseleave', () => suiviCarteSortie.masquer());
+
+document.getElementById('bouton-reset-altitude').addEventListener('click', () => graphiqueAltitude?.resetZoom());
+document.getElementById('bouton-reset-pente').addEventListener('click', () => graphiquePente?.resetZoom());
+
+// ── Graphique agrandi ──────────────────────────────────────────
+
+const METRIQUES = {
+    altitude: { titre: 'Profil altimétrique', titreAxeY: 'Altitude (m)', valeur: p => p.altitude },
+    pente: { titre: 'Profil de pente', titreAxeY: 'Pente (%)', valeur: p => p.pente * 100 },
+};
+
+function agrandirGraphique(cle) {
+    const { titre, titreAxeY, valeur } = METRIQUES[cle];
+
+    document.getElementById('titre-modale-graphique').textContent = titre;
+    document.getElementById('voile-graphique').classList.add('ouvert');
+
+    if (graphiqueGrand) graphiqueGrand.destroy();
+    graphiqueGrand = new Chart(document.getElementById('graphique-grand'), {
+        type: 'line',
+        data: { datasets: construireDatasets(jeuxCourants, valeur) },
+        options: optionsGraphiqueInteractif(titreAxeY, jeuxCourants, suiviInactif),
+    });
+}
+
+document.getElementById('bouton-agrandir-altitude').addEventListener('click', () => agrandirGraphique('altitude'));
+document.getElementById('bouton-agrandir-pente').addEventListener('click', () => agrandirGraphique('pente'));
+
+// ── Modale « Ajouter une trace » ──────────────────────────────────
+
+document.getElementById('ouvrir-modale').addEventListener('click', () =>
+    document.getElementById('voile-modale').classList.add('ouvert'));
+document.getElementById('fermer-modale').addEventListener('click', () =>
+    document.getElementById('voile-modale').classList.remove('ouvert'));
+document.getElementById('fermer-graphique').addEventListener('click', () =>
+    document.getElementById('voile-graphique').classList.remove('ouvert'));
+
+// Clic sur le voile ou touche Échap : ferme la modale ouverte, quelle qu'elle soit.
+document.querySelectorAll('.voile').forEach(v =>
+    v.addEventListener('click', e => { if (e.target === v) v.classList.remove('ouvert'); }));
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.voile.ouvert').forEach(v => v.classList.remove('ouvert'));
+});
+
+// ── Réglages d'analyse ──────────────────────────────────────────
+
+// Communs à l'aperçu et à l'archivage final : les deux doivent voir la même
+// trace, avec les mêmes seuils, ou l'aperçu ne sert à rien.
+function ajouterParametres(donnees) {
+    donnees.append('seuilDenivele', document.getElementById('reglage-seuil-denivele').value);
+    donnees.append('seuilVitesse', document.getElementById('reglage-seuil-vitesse').value);
+    donnees.append('fenetrePente', document.getElementById('reglage-fenetre-pente').value);
+    donnees.append('pasProfil', document.getElementById('reglage-pas-profil').value);
+}
+
+// ── Aperçu des fichiers avant archivage ──────────────────────────
+
+let cartePreview = null;
+let couchesPreview = [];
+
+function masquerApercu() {
+    document.getElementById('apercu-traces').hidden = true;
+    document.getElementById('liste-apercu').innerHTML = '';
+    couchesPreview.forEach(c => cartePreview?.removeLayer(c));
+    couchesPreview = [];
+}
+
+async function previsualiser() {
+    const fichiers = document.getElementById('champ-fichiers').files;
+    const conteneur = document.getElementById('apercu-traces');
+    const liste = document.getElementById('liste-apercu');
+
+    if (fichiers.length === 0) { masquerApercu(); return; }
+
+    conteneur.hidden = false;
+    liste.innerHTML = '<li class="badge-resultat">Analyse en cours…</li>';
+
+    const donnees = new FormData();
+    for (const fichier of fichiers) donnees.append('fichiers', fichier);
+    ajouterParametres(donnees);
+
+    const reponse = await fetch('/api/traces/apercu', { method: 'POST', body: donnees });
+
+    if (!reponse.ok) {
+        liste.innerHTML = '<li class="badge-resultat badge-erreur">✗ Aperçu indisponible.</li>';
+        return;
+    }
+
+    const apercus = await reponse.json();
+
+    liste.innerHTML = apercus.map((a, i) => a.erreur
+        ? `<li class="badge-resultat badge-erreur">✗ ${a.nomFichier} — ${a.erreur}</li>`
+        : `<li class="badge-resultat badge-succes">
+               <span class="puce-legende" style="background:${PALETTE[i % PALETTE.length]};display:inline-block;width:0.7em;height:0.7em;margin-right:0.35rem;"></span>
+               ${a.nom} — ${a.distanceKm.toFixed(2)} km, +${a.denivelePositif.toFixed(0)} m, −${a.deniveleNegatif.toFixed(0)} m${a.date ? ' — ' + a.date.slice(0, 10) : ''}
+           </li>`).join('');
+
+    dessinerApercu(apercus);
+}
+
+document.getElementById('champ-fichiers').addEventListener('change', previsualiser);
+
+// Changer un réglage alors qu'un aperçu est déjà affiché le recalcule aussitôt
+// — sinon l'aperçu mentirait sur les seuils réellement utilisés à l'envoi.
+document.querySelectorAll('.reglage').forEach(champ =>
+    champ.addEventListener('change', () => {
+        if (document.getElementById('champ-fichiers').files.length > 0) previsualiser();
+    }));
+
+function dessinerApercu(apercus) {
+    const avecCoordonnees = apercus.filter(a => a.points && a.points.length > 0);
+    const carteDiv = document.getElementById('carte-apercu');
+
+    if (avecCoordonnees.length === 0) { carteDiv.style.display = 'none'; return; }
+    carteDiv.style.display = 'block';
+
+    if (!cartePreview) {
+        cartePreview = L.map('carte-apercu');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            maxZoom: 19,
+        }).addTo(cartePreview);
+    }
+    cartePreview.invalidateSize();
+
+    couchesPreview.forEach(c => cartePreview.removeLayer(c));
+    couchesPreview = avecCoordonnees.map((a, i) =>
+        L.polyline(a.points.map(p => [p.lat, p.lon]), { color: PALETTE[i % PALETTE.length] }).addTo(cartePreview));
+
+    cartePreview.fitBounds(L.featureGroup(couchesPreview).getBounds());
+}
+
+function remplirSelectSorties(sorties) {
+    document.getElementById('select-sortie').innerHTML =
+        sorties.map(s => `<option value="${s.id}">${s.nom}</option>`).join('');
+}
+
+// Un seul des deux champs compte selon le bouton radio choisi : l'autre est
+// désactivé plutôt que laissé actif sans effet, pour éviter toute ambiguïté.
+document.querySelectorAll('input[name="cible"]').forEach(radio =>
+    radio.addEventListener('change', () => {
+        const surExistante = document.querySelector('input[name="cible"]:checked').value === 'existante';
+        document.getElementById('select-sortie').disabled = !surExistante;
+        document.getElementById('champ-nouvelle-sortie').disabled = surExistante;
+    }));
+
+function afficherResultatUpload(succes, resultat) {
+    const conteneur = document.getElementById('resultat-ajout');
+
+    if (!succes) {
+        const message = typeof resultat === 'string' ? resultat : 'Erreur inattendue.';
+        conteneur.innerHTML = `<p class="badge-resultat badge-erreur">✗ ${message}</p>`;
+        return;
+    }
+
+    const lignes = resultat.resultats.map(r => {
+        if (r.statut === 'archivee') {
+            return `<li class="badge-resultat badge-succes">✓ ${r.nomFichier} — trace n°${r.traceId} (${r.pointsStockes}/${r.pointsTotal} points de profil)</li>`;
+        }
+        if (r.statut === 'deja_archivee') {
+            return `<li class="badge-resultat badge-attention">↺ ${r.nomFichier} — déjà archivée</li>`;
+        }
+        return `<li class="badge-resultat badge-erreur">✗ ${r.nomFichier} — ${r.erreur}</li>`;
+    }).join('');
+
+    const messageSortie = resultat.sortieCreee
+        ? `Nouvelle sortie n°${resultat.sortieId} créée.`
+        : `Rattaché à la sortie n°${resultat.sortieId}.`;
+
+    conteneur.innerHTML = `<p style="font-size:0.85rem;color:var(--texte-discret);margin:0 0 0.3rem;">${messageSortie}</p><ul class="resultats-upload">${lignes}</ul>`;
+}
+
+document.getElementById('form-ajout').addEventListener('submit', async evenement => {
+    evenement.preventDefault();
+
+    const donnees = new FormData();
+
+    for (const fichier of document.getElementById('champ-fichiers').files) {
+        donnees.append('fichiers', fichier);
+    }
+
+    const cible = document.querySelector('input[name="cible"]:checked').value;
+
+    if (cible === 'existante') {
+        donnees.append('sortieId', document.getElementById('select-sortie').value);
+    } else {
+        donnees.append('nouvelleSortie', document.getElementById('champ-nouvelle-sortie').value);
+    }
+
+    ajouterParametres(donnees);
+
+    const bouton = document.getElementById('bouton-envoyer');
+    bouton.disabled = true;
+    bouton.textContent = 'Analyse en cours…';
+
+    try {
+        const reponse = await fetch('/api/traces', { method: 'POST', body: donnees });
+        const resultat = await reponse.json();
+
+        afficherResultatUpload(reponse.ok, resultat);
+
+        if (reponse.ok) {
+            evenement.target.reset();
+            document.getElementById('select-sortie').disabled = false;
+            document.getElementById('champ-nouvelle-sortie').disabled = true;
+            masquerApercu();
+            chargerListe();
+        }
+    } finally {
+        bouton.disabled = false;
+        bouton.textContent = 'Analyser et archiver';
+    }
+});
+
+// ── Matériel : catégories, comparaison de candidats, inventaire ──
+//
+// Domaine indépendant du GPX ci-dessus, même s'il vit dans le même fichier
+// front — aucune fonction ni variable partagée avec ce qui précède.
+//
+// Tout s'édite en place (cartes, lignes de tableau) : aucune fenêtre modale
+// dans ce module. C'est un choix délibéré, différent du reste de l'appli —
+// comparer du matériel avant achat est une tâche qu'on veut pouvoir faire
+// vite, en magasin, sans ouvrir/fermer des popups pour chaque champ.
+
+const LABELS_STATUT = { a_etudier: 'À étudier', retenu: 'Retenu', ecarte: 'Écarté', achete: 'Acheté' };
+const LABELS_AVANCEMENT = { rien: 'Rien', en_cours: 'En cours', tranche: 'Tranché', achete: 'Acheté' };
+
+function noeudDepuisHtml(html) {
+    const conteneur = document.createElement('div');
+    conteneur.innerHTML = html.trim();
+    return conteneur.firstElementChild;
+}
+
+
+// ── Filtres transverses par tag / discipline ──────────────────────
+// Réutilisés sur les 3 vues (catégories, candidats d'une catégorie,
+// inventaire) : mêmes puces cliquables, même logique de correspondance.
+// Un candidat peut avoir plusieurs tags et plusieurs disciplines à la fois.
+
+function creerBarreFiltres(conteneur, entites, filtresActifs, onChange) {
+    const disciplines = new Set();
+    const tags = new Set();
+    entites.forEach(e => {
+        (e.disciplines || []).forEach(d => disciplines.add(d));
+        (e.tags || []).forEach(t => tags.add(t));
+    });
+    const chips = [
+        ...[...disciplines].sort().map(valeur => ({ type: 'discipline', valeur })),
+        ...[...tags].sort().map(valeur => ({ type: 'tag', valeur })),
+    ];
+
+    conteneur.hidden = chips.length === 0;
+    conteneur.innerHTML = '';
+
+    chips.forEach(({ type, valeur }) => {
+        const cle = `${type}:${valeur}`;
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = `chip-filtre chip-filtre-${type}${filtresActifs.has(cle) ? ' actif' : ''}`;
+        chip.textContent = valeur;
+        chip.addEventListener('click', () => {
+            if (filtresActifs.has(cle)) filtresActifs.delete(cle); else filtresActifs.add(cle);
+            creerBarreFiltres(conteneur, entites, filtresActifs, onChange); // réaffiche l'état actif/inactif
+            onChange();
+        });
+        conteneur.appendChild(chip);
+    });
+}
+
+// Une entité correspond si elle a AU MOINS UN tag/discipline pour chaque
+// filtre actif — tous les filtres actifs doivent être satisfaits ensemble.
+function entiteCorrespondAuxFiltres(entite, filtresActifs) {
+    if (filtresActifs.size === 0) return true;
+    return [...filtresActifs].every(cle => {
+        const i = cle.indexOf(':');
+        const type = cle.slice(0, i);
+        const valeur = cle.slice(i + 1);
+        const liste = type === 'tag' ? entite.tags : entite.disciplines;
+        return (liste || []).includes(valeur);
+    });
+}
+
+function pucesTagsEtDisciplines(entite) {
+    const puces = [
+        ...(entite.disciplines || []).map(v => `<li class="puce-spec puce-discipline">${v}</li>`),
+        ...(entite.tags || []).map(v => `<li class="puce-spec puce-tag">${v}</li>`),
+    ];
+    return puces.length ? `<ul class="specs-puces">${puces.join('')}</ul>` : '';
+}
+
+// ── Liste des catégories, en tuiles ──
+
+let filtresCategoriesActifs = new Set();
+let cacheCategoriesMateriel = { categories: [], candidats: [] };
+
+async function chargerCategoriesMateriel() {
+    const [reponseCategories, reponseCandidats] = await Promise.all([
+        fetch('/api/materiel/categories'),
+        fetch('/api/materiel/candidats'),
+    ]);
+    if (!reponseCategories.ok) return;
+
+    cacheCategoriesMateriel = {
+        categories: await reponseCategories.json(),
+        candidats: reponseCandidats.ok ? await reponseCandidats.json() : [],
+    };
+
+    document.getElementById('badge-materiel-categories').textContent = `${cacheCategoriesMateriel.categories.length} catégorie(s)`;
+
+    creerBarreFiltres(document.getElementById('filtres-categories'), cacheCategoriesMateriel.candidats,
+        filtresCategoriesActifs, afficherTuilesCategories);
+    afficherTuilesCategories();
+}
+
+function afficherTuilesCategories() {
+    const { categories, candidats } = cacheCategoriesMateriel;
+
+    const visibles = filtresCategoriesActifs.size === 0
+        ? categories
+        : categories.filter(cat => candidats.some(cd =>
+            cd.categorieId === cat.id && entiteCorrespondAuxFiltres(cd, filtresCategoriesActifs)));
+
+    document.getElementById('grille-categories').innerHTML = visibles.map(c => `
+        <div class="categorie-tuile" data-id="${c.id}" data-nom="${c.nom}" data-notes="${c.notes || ''}">
+            <div class="categorie-tuile-photo">
+                ${c.photoUrl
+                    ? `<img src="${c.photoUrl}" alt="${c.nom}" loading="lazy">`
+                    : `<span class="categorie-tuile-lettre">${c.nom.charAt(0)}</span>`}
+            </div>
+            <div class="categorie-tuile-corps">
+                <span class="badge-statut badge-statut-${c.statutAvancement}">${LABELS_AVANCEMENT[c.statutAvancement]}</span>
+                <div class="categorie-titre">${c.nom}</div>
+                <div class="categorie-meta">${c.priorite != null ? `Priorité ${c.priorite} · ` : ''}${c.nombreCandidats} candidat(s)</div>
+            </div>
+        </div>`).join('');
+
+    document.querySelectorAll('.categorie-tuile').forEach(tuile =>
+        tuile.addEventListener('click', () =>
+            afficherCategorieMateriel(Number(tuile.dataset.id), tuile.dataset.nom, tuile.dataset.notes)));
+}
+
+// Le bouton "+ Catégorie" bascule un formulaire intégré à la page, pas une
+// fenêtre séparée.
+document.getElementById('bouton-nouvelle-categorie').addEventListener('click', () => {
+    const formulaire = document.getElementById('formulaire-nouvelle-categorie');
+    formulaire.hidden = !formulaire.hidden;
+    if (!formulaire.hidden) {
+        document.getElementById('champ-nom-categorie').value = '';
+        document.getElementById('champ-priorite-categorie').value = '';
+        document.getElementById('champ-notes-categorie').value = '';
+        document.getElementById('message-nouvelle-categorie').textContent = '';
+        document.getElementById('champ-nom-categorie').focus();
+    }
+});
+
+document.getElementById('bouton-annuler-categorie').addEventListener('click', () => {
+    document.getElementById('formulaire-nouvelle-categorie').hidden = true;
+});
+
+document.getElementById('bouton-creer-categorie').addEventListener('click', async () => {
+    const nom = document.getElementById('champ-nom-categorie').value.trim();
+    const messageEl = document.getElementById('message-nouvelle-categorie');
+    if (!nom) { messageEl.textContent = 'Le nom est obligatoire.'; return; }
+
+    const priorite = document.getElementById('champ-priorite-categorie').value;
+    const notes = document.getElementById('champ-notes-categorie').value.trim();
+
+    const reponse = await fetch('/api/materiel/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nom, priorite: priorite ? Number(priorite) : null, notes: notes || null }),
+    });
+
+    if (!reponse.ok) { messageEl.textContent = await reponse.text() || 'Création impossible.'; return; }
+
+    document.getElementById('formulaire-nouvelle-categorie').hidden = true;
+    chargerCategoriesMateriel();
+});
+
+// ── Détail d'une catégorie : candidats comparables côte à côte ──
+
+let categorieCourante = null;
+let filtresCandidatsActifs = new Set();
+let cacheCandidats = [];
+
+async function afficherCategorieMateriel(id, nom, notes) {
+    categorieCourante = id;
+    filtresCandidatsActifs = new Set(); // on repart sans filtre à chaque catégorie visitée
+    document.getElementById('titre-categorie-materiel').textContent = nom;
+    document.getElementById('notes-categorie-materiel').textContent = notes || '';
+    ouvrirPage('materiel-categorie', nom);
+    await chargerCandidats();
+}
+
+async function chargerCandidats() {
+    const reponse = await fetch(`/api/materiel/categories/${categorieCourante}/candidats`);
+    if (!reponse.ok) return;
+
+    cacheCandidats = await reponse.json();
+    document.getElementById('badge-categorie-materiel').textContent = `${cacheCandidats.length} candidat(s)`;
+
+    creerBarreFiltres(document.getElementById('filtres-candidats'), cacheCandidats,
+        filtresCandidatsActifs, afficherCartesCandidats);
+    afficherCartesCandidats();
+}
+
+function afficherCartesCandidats() {
+    const visibles = cacheCandidats.filter(c => entiteCorrespondAuxFiltres(c, filtresCandidatsActifs));
+
+    const grille = document.getElementById('grille-candidats');
+    grille.innerHTML = '';
+
+    visibles.forEach(c => {
+        const carte = noeudDepuisHtml(carteCandidatVue(c));
+        cablerCarteVue(carte, c);
+        grille.appendChild(carte);
+    });
+
+    const ajout = document.createElement('div');
+    ajout.className = 'candidat-carte-ajout';
+    ajout.textContent = '+ Nouveau candidat';
+    ajout.addEventListener('click', () => {
+        const vide = { id: null, marque: '', modele: '', prixIndicatif: null, url: '', statut: 'a_etudier',
+                        motif: '', specs: null, essayageRequis: false, tags: [], disciplines: [], photos: [] };
+        const edition = noeudDepuisHtml(carteCandidatEdition(vide));
+        cablerCarteEdition(edition, vide);
+        ajout.replaceWith(edition);
+    });
+    grille.appendChild(ajout);
+}
+
+// Rien du tout tant qu'il n'y a pas de photo — un gros pavé en pointillés
+// vide, en tête de carte, alourdit surtout les fiches qui n'en ont pas
+// encore (la majorité). L'ajout se fait alors via boutonAjouterPhotoHtml(),
+// un simple lien discret dans les actions, pas une zone dédiée.
+function photosVignettesHtml(c) {
+    if (!c.photos || c.photos.length === 0) return '';
+
+    const vignettes = c.photos.map(p => `
+        <div class="candidat-photo-vignette" data-id="${p.id}" data-url="${p.url}" data-nom="${p.nomFichier}">
+            <img src="${p.url}" alt="${p.nomFichier}" loading="lazy">
+        </div>`).join('');
+
+    return `<div class="candidat-photos">
+        ${vignettes}
+        <label class="candidat-photo-ajout">
+            +
+            <input type="file" class="champ-photo-candidat" accept="image/*" multiple hidden>
+        </label>
+    </div>`;
+}
+
+function boutonAjouterPhotoHtml(c) {
+    if (c.photos && c.photos.length > 0) return '';
+    return `<label class="bouton-discret champ-photo-discret">
+        + Photo
+        <input type="file" class="champ-photo-candidat" accept="image/*" multiple hidden>
+    </label>`;
+}
+
+// Les caractéristiques (specs), tags et disciplines se lisent comme des
+// puces, à la façon des fiches produit — pas comme un tableau technique.
+function carteCandidatVue(c) {
+    const puces = [];
+    if (c.essayageRequis) puces.push(['Essayage', 'requis']);
+    if (c.specs) Object.entries(c.specs).forEach(([cle, valeur]) => puces.push([cle, valeur]));
+
+    const pucesHtml = puces.length
+        ? `<ul class="specs-puces">${puces.map(([cle, valeur]) => `<li class="puce-spec"><strong>${cle}</strong> ${valeur}</li>`).join('')}</ul>`
+        : '';
+
+    return `
+    <div class="candidat-carte" data-statut="${c.statut}">
+        ${photosVignettesHtml(c)}
+        <div class="candidat-entete">
+            <div class="candidat-identite">
+                ${c.marque ? `<span class="candidat-marque">${c.marque}</span>` : ''}
+                <div class="candidat-titre">${c.modele}</div>
+            </div>
+            ${c.prixIndicatif != null ? `<div class="candidat-prix">${c.prixIndicatif.toFixed(0)} €</div>` : ''}
+        </div>
+        <span class="badge-statut badge-statut-${c.statut}">${LABELS_STATUT[c.statut]}</span>
+        ${c.motif ? `<p class="candidat-verdict">${c.motif}</p>` : ''}
+        ${pucesHtml}
+        ${pucesTagsEtDisciplines(c)}
+        <div class="actions">
+            <button class="bouton-discret bouton-modifier-candidat" type="button">✎ Modifier</button>
+            ${c.statut === 'retenu' ? `<button class="bouton-discret bouton-acheter-candidat" type="button">Marquer acheté</button>` : ''}
+            ${c.url ? `<a class="bouton-discret" href="${c.url}" target="_blank" rel="noopener">Lien ↗</a>` : ''}
+            ${boutonAjouterPhotoHtml(c)}
+        </div>
+    </div>`;
+}
+
+function cablerCarteVue(carte, c) {
+    carte.querySelectorAll('.candidat-photo-vignette').forEach(vignette =>
+        vignette.addEventListener('click', () =>
+            ouvrirPhoto(Number(vignette.dataset.id), vignette.dataset.url, vignette.dataset.nom,
+                `/api/materiel/photos/${vignette.dataset.id}`, () => chargerCandidats())));
+
+    carte.querySelector('.champ-photo-candidat').addEventListener('change', async evenement => {
+        const fichiers = evenement.target.files;
+        if (fichiers.length === 0) return;
+
+        const donnees = new FormData();
+        for (const fichier of fichiers) donnees.append('fichiers', fichier);
+
+        await fetch(`/api/materiel/candidats/${c.id}/photos`, { method: 'POST', body: donnees });
+        chargerCandidats();
+        chargerCategoriesMateriel(); // la tuile de catégorie peut hériter de cette photo
+    });
+
+    carte.querySelector('.bouton-modifier-candidat').addEventListener('click', () => {
+        const edition = noeudDepuisHtml(carteCandidatEdition(c));
+        cablerCarteEdition(edition, c);
+        carte.replaceWith(edition);
+    });
+
+    const boutonAcheter = carte.querySelector('.bouton-acheter-candidat');
+    if (boutonAcheter) {
+        boutonAcheter.addEventListener('click', () => {
+            if (carte.querySelector('.achat-inline')) return; // déjà ouvert
+            const achat = noeudDepuisHtml(formulaireAchatHtml());
+            cablerFormulaireAchat(achat, c.id);
+            carte.appendChild(achat);
+        });
+    }
+}
+
+// La carte elle-même devient le formulaire — pas de fenêtre à côté. Tags et
+// disciplines se saisissent en liste séparée par des virgules : plus simple
+// qu'un éditeur de puces dédié pour une poignée de mots courts.
+function carteCandidatEdition(c) {
+    return `
+    <div class="candidat-carte candidat-carte-edition">
+        <input type="text" class="champ-texte edit-marque" placeholder="Marque" value="${c.marque || ''}">
+        <input type="text" class="champ-texte edit-modele" placeholder="Modèle" value="${c.modele || ''}">
+        <input type="number" class="champ-texte edit-prix" placeholder="Prix indicatif (€)" step="0.01" min="0" value="${c.prixIndicatif ?? ''}">
+        <input type="url" class="champ-texte edit-url" placeholder="Lien" value="${c.url || ''}">
+        <select class="champ-texte edit-statut">
+            <option value="a_etudier" ${c.statut === 'a_etudier' ? 'selected' : ''}>À étudier</option>
+            <option value="retenu" ${c.statut === 'retenu' ? 'selected' : ''}>Retenu</option>
+            <option value="ecarte" ${c.statut === 'ecarte' ? 'selected' : ''}>Écarté</option>
+            <option value="achete" ${c.statut === 'achete' ? 'selected' : ''}>Acheté</option>
+        </select>
+        <textarea class="champ-texte edit-motif" rows="2" placeholder="Motif (pourquoi retenu ou écarté)">${c.motif || ''}</textarea>
+        <label class="ligne-checkbox">
+            <input type="checkbox" class="edit-essayage" ${c.essayageRequis ? 'checked' : ''}>
+            Essayage requis
+        </label>
+        <input type="text" class="champ-texte edit-disciplines" placeholder="Disciplines (séparées par des virgules)" value="${(c.disciplines || []).join(', ')}">
+        <input type="text" class="champ-texte edit-tags" placeholder="Tags (séparés par des virgules)" value="${(c.tags || []).join(', ')}">
+        <div class="edit-specs"></div>
+        <button type="button" class="bouton-discret bouton-ajouter-spec-inline">+ Attribut</button>
+        <div class="actions">
+            <button class="btn-tech plein bouton-enregistrer-candidat-inline" type="button">Enregistrer</button>
+            <button class="bouton-discret bouton-annuler-candidat-inline" type="button">Annuler</button>
+        </div>
+        <p class="message edit-message"></p>
+    </div>`;
+}
+
+// "escalade, alpinisme,, hiver" → ["escalade","alpinisme","hiver"] : les
+// doublons/espaces/entrées vides de saisie sont nettoyés silencieusement.
+function listeDepuisChamp(valeur) {
+    return [...new Set(valeur.split(',').map(v => v.trim()).filter(v => v))];
+}
+
+function ajouterLigneSpecInline(conteneur, cle = '', valeur = '') {
+    const ligne = document.createElement('div');
+    ligne.className = 'ligne-spec';
+    ligne.innerHTML = `
+        <input type="text" class="spec-cle" placeholder="Clé" value="${cle}">
+        <input type="text" class="spec-valeur" placeholder="Valeur" value="${valeur}">
+        <button type="button" class="spec-supprimer">✕</button>`;
+    ligne.querySelector('.spec-supprimer').addEventListener('click', () => ligne.remove());
+    conteneur.appendChild(ligne);
+}
+
+// Une seule valeur par clé : un doublon de saisie écrase silencieusement le
+// précédent, plutôt que de complexifier la validation pour un cas rare.
+function lireSpecsDe(carte) {
+    const specs = {};
+    carte.querySelectorAll('.edit-specs .ligne-spec').forEach(ligne => {
+        const cle = ligne.querySelector('.spec-cle').value.trim();
+        const valeur = ligne.querySelector('.spec-valeur').value.trim();
+        if (cle) specs[cle] = valeur;
+    });
+    return Object.keys(specs).length > 0 ? specs : null;
+}
+
+function cablerCarteEdition(carte, candidatOriginal) {
+    const conteneurSpecs = carte.querySelector('.edit-specs');
+    if (candidatOriginal.specs) {
+        Object.entries(candidatOriginal.specs).forEach(([cle, valeur]) => ajouterLigneSpecInline(conteneurSpecs, cle, valeur));
+    }
+
+    carte.querySelector('.bouton-ajouter-spec-inline').addEventListener('click', () => ajouterLigneSpecInline(conteneurSpecs));
+
+    carte.querySelector('.bouton-annuler-candidat-inline').addEventListener('click', () => {
+        if (candidatOriginal.id === null) { carte.remove(); return; } // annuler une création : retirer la carte vide
+        const vue = noeudDepuisHtml(carteCandidatVue(candidatOriginal));
+        cablerCarteVue(vue, candidatOriginal);
+        carte.replaceWith(vue);
+    });
+
+    carte.querySelector('.bouton-enregistrer-candidat-inline').addEventListener('click', async () => {
+        const messageEl = carte.querySelector('.edit-message');
+        const modele = carte.querySelector('.edit-modele').value.trim();
+        if (!modele) { messageEl.textContent = 'Le modèle est obligatoire.'; return; }
+
+        const prix = carte.querySelector('.edit-prix').value;
+
+        const corps = {
+            categorieId: categorieCourante,
+            marque: carte.querySelector('.edit-marque').value.trim() || null,
+            modele,
+            prixIndicatif: prix ? Number(prix) : null,
+            url: carte.querySelector('.edit-url').value.trim() || null,
+            statut: carte.querySelector('.edit-statut').value,
+            motif: carte.querySelector('.edit-motif').value.trim() || null,
+            specs: lireSpecsDe(carte),
+            essayageRequis: carte.querySelector('.edit-essayage').checked,
+            tags: listeDepuisChamp(carte.querySelector('.edit-tags').value),
+            disciplines: listeDepuisChamp(carte.querySelector('.edit-disciplines').value),
+        };
+
+        const url = candidatOriginal.id === null ? '/api/materiel/candidats' : `/api/materiel/candidats/${candidatOriginal.id}`;
+        const methode = candidatOriginal.id === null ? 'POST' : 'PUT';
+
+        const reponse = await fetch(url, {
+            method: methode,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corps),
+        });
+
+        if (!reponse.ok) { messageEl.textContent = await reponse.text() || 'Enregistrement impossible.'; return; }
+
+        chargerCandidats();
+        chargerCategoriesMateriel(); // pour que l'avancement affiché reste à jour au retour
+    });
+}
+
+// ── Achat : formulaire dépliable directement dans la carte du candidat ──
+
+function formulaireAchatHtml() {
+    const aujourdHui = new Date().toISOString().slice(0, 10);
+    return `
+    <div class="achat-inline">
+        <input type="date" class="champ-texte achat-date" value="${aujourdHui}">
+        <input type="number" class="champ-texte achat-prix" placeholder="Prix payé (€)" step="0.01" min="0">
+        <input type="text" class="champ-texte achat-taille" placeholder="Taille">
+        <input type="text" class="champ-texte achat-etat" placeholder="État" value="neuf">
+        <input type="date" class="champ-texte achat-limite" title="Date limite d'usage (EPI, si applicable)">
+        <textarea class="champ-texte achat-notes" rows="2" placeholder="Notes"></textarea>
+        <div class="actions">
+            <button class="btn-tech plein bouton-confirmer-achat-inline" type="button">Confirmer l'achat</button>
+            <button class="bouton-discret bouton-annuler-achat-inline" type="button">Annuler</button>
+        </div>
+        <p class="message achat-message"></p>
+    </div>`;
+}
+
+function cablerFormulaireAchat(bloc, candidatId) {
+    bloc.querySelector('.bouton-annuler-achat-inline').addEventListener('click', () => bloc.remove());
+
+    bloc.querySelector('.bouton-confirmer-achat-inline').addEventListener('click', async () => {
+        const dateAchat = bloc.querySelector('.achat-date').value;
+        const prixPaye = bloc.querySelector('.achat-prix').value;
+        const dateLimiteUsage = bloc.querySelector('.achat-limite').value;
+
+        // Dates stockées "yyyy-MM-dd HH:mm:ss" partout dans l'appli — un
+        // input date ne donne que le jour, l'heure est fixée à minuit.
+        const corps = {
+            dateAchat: dateAchat ? `${dateAchat} 00:00:00` : null,
+            prixPaye: prixPaye ? Number(prixPaye) : null,
+            taille: bloc.querySelector('.achat-taille').value.trim() || null,
+            etat: bloc.querySelector('.achat-etat').value.trim() || null,
+            dateLimiteUsage: dateLimiteUsage ? `${dateLimiteUsage} 00:00:00` : null,
+            notesUsage: bloc.querySelector('.achat-notes').value.trim() || null,
+        };
+
+        const reponse = await fetch(`/api/materiel/candidats/${candidatId}/achat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corps),
+        });
+
+        if (!reponse.ok) {
+            bloc.querySelector('.achat-message').textContent = await reponse.text() || 'Enregistrement impossible.';
+            return;
+        }
+
+        chargerCandidats();
+        chargerCategoriesMateriel();
+    });
+}
+
+// ── Inventaire et alertes de fin de vie ──
+
+let filtresInventaireActifs = new Set();
+let cachePossessions = [];
+
+async function chargerInventaire() {
+    const [reponsePossessions, reponseAlertes] = await Promise.all([
+        fetch('/api/materiel/possessions'),
+        fetch('/api/materiel/alertes'),
+    ]);
+
+    if (reponsePossessions.ok) {
+        cachePossessions = await reponsePossessions.json();
+        document.getElementById('badge-inventaire').textContent = `${cachePossessions.length} article(s)`;
+
+        creerBarreFiltres(document.getElementById('filtres-inventaire'), cachePossessions,
+            filtresInventaireActifs, afficherGrilleInventaire);
+        remplirFiltreCategorieInventaire();
+        afficherGrilleInventaire();
+    }
+
+    const panelAlertes = document.getElementById('panel-alertes');
+    if (reponseAlertes.ok) {
+        const alertes = await reponseAlertes.json();
+        panelAlertes.hidden = alertes.length === 0;
+        document.getElementById('corps-alertes').innerHTML = alertes.map(a => `
+            <div class="alerte-ligne cliquable" data-possession-id="${a.possessionId}">
+                <span>${a.marque ? a.marque + ' ' : ''}${a.modele} — ${a.categorieNom}</span>
+                <span class="alerte-echeance">${a.dateLimiteUsage.slice(0, 10)}</span>
+            </div>`).join('');
+
+        document.querySelectorAll('#corps-alertes .alerte-ligne').forEach(el =>
+            el.addEventListener('click', () => ouvrirEditionDepuisAlerte(Number(el.dataset.possessionId))));
+    }
+}
+
+// Un clic sur une alerte amène directement à la fiche concernée, déjà
+// ouverte en édition — pas la peine de la rechercher ensuite dans la grille.
+function ouvrirEditionDepuisAlerte(possessionId) {
+    const carte = document.querySelector(`.candidat-carte[data-possession-id="${possessionId}"]`);
+    if (!carte) return;
+    carte.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    carte.querySelector('.bouton-modifier-possession')?.click();
+}
+
+// Un article, une catégorie : contrairement aux tags/disciplines (à valeurs
+// multiples, donc des puces), un simple sélecteur suffit et évite d'avoir
+// une grille coupée en autant de petites rangées à moitié vides qu'il y a
+// de catégories.
+function remplirFiltreCategorieInventaire() {
+    const categories = [...new Set(cachePossessions.map(p => p.categorieNom))].sort();
+    const select = document.getElementById('filtre-categorie-inventaire');
+    const valeurCourante = select.value;
+
+    select.innerHTML = `<option value="">Toutes catégories</option>`
+        + categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    select.value = valeurCourante;
+}
+
+document.getElementById('filtre-categorie-inventaire').addEventListener('change', afficherGrilleInventaire);
+
+// Une seule grille continue, qui se remplit du haut vers le bas et de
+// gauche à droite quel que soit le nombre d'articles par catégorie — la
+// catégorie se filtre à côté plutôt que de forcer un regroupement visuel.
+function afficherGrilleInventaire() {
+    const categorieChoisie = document.getElementById('filtre-categorie-inventaire').value;
+
+    const visibles = cachePossessions.filter(p =>
+        entiteCorrespondAuxFiltres(p, filtresInventaireActifs)
+        && (!categorieChoisie || p.categorieNom === categorieChoisie));
+
+    const grille = document.getElementById('grille-inventaire');
+    grille.innerHTML = '';
+
+    if (visibles.length === 0) {
+        grille.innerHTML = '<p class="message">Aucun article ne correspond à ces filtres.</p>';
+        return;
+    }
+
+    visibles.forEach(p => {
+        const carte = noeudDepuisHtml(possessionCarteVue(p));
+        cablerPossessionCarteVue(carte, p);
+        grille.appendChild(carte);
+    });
+}
+
+// Mêmes cartes produit que la comparaison de candidats (.candidat-carte) —
+// une possession, c'est juste un candidat dont on connaît en plus l'achat.
+function possessionCarteVue(p) {
+    const puces = [];
+    if (p.dateAchat) puces.push(['Acheté', p.dateAchat.slice(0, 10)]);
+    if (p.taille) puces.push(['Taille', p.taille]);
+    if (p.etat) puces.push(['État', p.etat]);
+
+    const pucesHtml = puces.length
+        ? `<ul class="specs-puces">${puces.map(([cle, valeur]) => `<li class="puce-spec"><strong>${cle}</strong> ${valeur}</li>`).join('')}</ul>`
+        : '';
+
+    const alerteHtml = p.dateLimiteUsage
+        ? `<p class="candidat-verdict" style="background: rgba(194,59,46,0.08);">⚠ Fin de vie d'usage : ${p.dateLimiteUsage.slice(0, 10)}</p>`
+        : '';
+
+    return `
+    <div class="candidat-carte" data-possession-id="${p.id}">
+        ${photosVignettesHtml(p)}
+        <div class="candidat-entete">
+            <div class="candidat-identite">
+                <span class="candidat-marque">${p.marque ? p.marque + ' · ' : ''}${p.categorieNom}</span>
+                <div class="candidat-titre">${p.modele}</div>
+            </div>
+            ${p.prixPaye != null ? `<div class="candidat-prix">${p.prixPaye.toFixed(0)} €</div>` : ''}
+        </div>
+        ${pucesHtml}
+        ${alerteHtml}
+        ${p.notesUsage ? `<p class="candidat-verdict">${p.notesUsage}</p>` : ''}
+        ${pucesTagsEtDisciplines(p)}
+        <div class="actions">
+            <button class="bouton-discret bouton-modifier-possession" type="button">✎ Modifier</button>
+            ${boutonAjouterPhotoHtml(p)}
+        </div>
+    </div>`;
+}
+
+function cablerPossessionCarteVue(carte, p) {
+    // Les photos affichées sont celles du candidat d'origine : la visionneuse
+    // et l'ajout pointent donc vers les routes candidat, pas possession.
+    carte.querySelectorAll('.candidat-photo-vignette').forEach(vignette =>
+        vignette.addEventListener('click', () =>
+            ouvrirPhoto(Number(vignette.dataset.id), vignette.dataset.url, vignette.dataset.nom,
+                `/api/materiel/photos/${vignette.dataset.id}`, () => chargerInventaire())));
+
+    carte.querySelector('.champ-photo-candidat').addEventListener('change', async evenement => {
+        const fichiers = evenement.target.files;
+        if (fichiers.length === 0) return;
+
+        const donnees = new FormData();
+        for (const fichier of fichiers) donnees.append('fichiers', fichier);
+
+        await fetch(`/api/materiel/candidats/${p.candidatId}/photos`, { method: 'POST', body: donnees });
+        chargerInventaire();
+    });
+
+    carte.querySelector('.bouton-modifier-possession').addEventListener('click', () => {
+        const edition = noeudDepuisHtml(possessionCarteEdition(p));
+        cablerPossessionCarteEdition(edition, p);
+        carte.replaceWith(edition);
+    });
+}
+
+function possessionCarteEdition(p) {
+    return `
+    <div class="candidat-carte candidat-carte-edition" data-possession-id="${p.id}">
+        <div class="candidat-identite">
+            ${p.marque ? `<span class="candidat-marque">${p.marque}</span>` : ''}
+            <div class="candidat-titre">${p.modele}</div>
+        </div>
+        <input type="date" class="champ-texte edit-date" value="${p.dateAchat ? p.dateAchat.slice(0, 10) : ''}">
+        <input type="number" class="champ-texte edit-prix" placeholder="Prix payé (€)" step="0.01" min="0" value="${p.prixPaye ?? ''}">
+        <input type="text" class="champ-texte edit-taille" placeholder="Taille" value="${p.taille || ''}">
+        <input type="text" class="champ-texte edit-etat" placeholder="État" value="${p.etat || ''}">
+        <input type="date" class="champ-texte edit-limite" title="Date limite d'usage (EPI)" value="${p.dateLimiteUsage ? p.dateLimiteUsage.slice(0, 10) : ''}">
+        <textarea class="champ-texte edit-notes" rows="2" placeholder="Notes d'usage">${p.notesUsage || ''}</textarea>
+        <div class="actions">
+            <button class="btn-tech plein bouton-enregistrer-possession-inline" type="button">Enregistrer</button>
+            <button class="bouton-discret bouton-annuler-possession-inline" type="button">Annuler</button>
+        </div>
+        <p class="message edit-message"></p>
+    </div>`;
+}
+
+function cablerPossessionCarteEdition(carte, p) {
+    carte.querySelector('.bouton-annuler-possession-inline').addEventListener('click', () => {
+        const vue = noeudDepuisHtml(possessionCarteVue(p));
+        cablerPossessionCarteVue(vue, p);
+        carte.replaceWith(vue);
+    });
+
+    carte.querySelector('.bouton-enregistrer-possession-inline').addEventListener('click', async () => {
+        const messageEl = carte.querySelector('.edit-message');
+        const dateAchat = carte.querySelector('.edit-date').value;
+        const prixPaye = carte.querySelector('.edit-prix').value;
+        const dateLimiteUsage = carte.querySelector('.edit-limite').value;
+
+        const corps = {
+            dateAchat: dateAchat ? `${dateAchat} 00:00:00` : null,
+            prixPaye: prixPaye ? Number(prixPaye) : null,
+            taille: carte.querySelector('.edit-taille').value.trim() || null,
+            etat: carte.querySelector('.edit-etat').value.trim() || null,
+            dateLimiteUsage: dateLimiteUsage ? `${dateLimiteUsage} 00:00:00` : null,
+            notesUsage: carte.querySelector('.edit-notes').value.trim() || null,
+        };
+
+        const reponse = await fetch(`/api/materiel/possessions/${p.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(corps),
+        });
+
+        if (!reponse.ok) { messageEl.textContent = await reponse.text() || 'Enregistrement impossible.'; return; }
+
+        chargerInventaire();
+    });
+}
+
+// ── Filtre de recherche (Historique) ────────────────────────────
+// Celui des Sorties est géré par afficherFilSorties() (tri + tags + texte
+// combinés) — voir plus haut.
+
+// Filtre purement local : le tableau est déjà entièrement chargé, pas
+// besoin d'un aller-retour serveur pour cacher des lignes déjà présentes.
+function activerFiltre(champId, corpsId) {
+    document.getElementById(champId).addEventListener('input', evenement => {
+        const terme = evenement.target.value.trim().toLowerCase();
+        document.querySelectorAll(`#${corpsId} tr`).forEach(ligne => {
+            ligne.hidden = terme.length > 0 && !ligne.textContent.toLowerCase().includes(terme);
+        });
+    });
+}
+
+activerFiltre('filtre-historique', 'corps-historique');
+
+chargerListe();
 </script>
+
+</body>
+</html>

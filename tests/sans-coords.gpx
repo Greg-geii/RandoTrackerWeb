@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Test" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Points sans coordonnees</name>
+    <trkseg>
+      <trkpt><ele>250.0</ele></trkpt>
+      <trkpt lat="44.18"><ele>265.5</ele></trkpt>
+      <trkpt lon="4.40"><ele>280.2</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
